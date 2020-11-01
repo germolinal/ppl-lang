@@ -1,6 +1,6 @@
 use crate::scanner::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum TokenType{
     // General
     EOF,

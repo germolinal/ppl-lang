@@ -4,6 +4,7 @@ mod values;
 mod chunk;
 mod debug;
 mod vm;
-mod compiler;
+mod parser;
 mod scanner;
 mod token;
+mod parse_function;

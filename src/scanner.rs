@@ -18,6 +18,8 @@ pub struct Scanner<'a> {
     current_index: usize,
 
     start_index: usize,
+
+    error_msg: String,
 }
 
 impl <'a>Scanner<'a> {
@@ -30,7 +32,17 @@ impl <'a>Scanner<'a> {
             source: source,
             current_index: 0,
             start_index: 0,
+            error_msg : "".to_string(),
         }
+    }
+
+    pub fn error_msg(&self)->String{
+        // This does not need to be fast.
+        self.error_msg.clone()
+    }
+
+    pub fn source(&self)->&Vec<u8>{
+        self.source
     }
 
     pub fn line(&self)->usize{
@@ -93,6 +105,12 @@ impl <'a>Scanner<'a> {
     }
 
     fn skip_white_space(&mut self){
+        
+        // Prevent segfault
+        if self.is_at_end(){
+            return;
+        }
+
         loop {            
             unsafe{
                 match self.peek(){
@@ -163,7 +181,10 @@ impl <'a>Scanner<'a> {
             unsafe{
                 next = match self.advance(){
                     Some(v) => v,
-                    None => return Token::new(self,TokenType::Error)
+                    None => {
+                        self.error_msg = format!("Unterminated string, started at line {}", start_line);
+                        return Token::new(self,TokenType::Error)
+                    }
                 };
             }
         }
@@ -342,6 +363,7 @@ impl <'a>Scanner<'a> {
         if c.is_ascii_alphabetic() || c == '_'{
             return self.identifier();
         }  
+
         // 0..9 allowed
         if c.is_ascii_digit(){
             return self.number();
@@ -404,7 +426,10 @@ impl <'a>Scanner<'a> {
             '"' => {return self.string();}
 
             // Error            
-            _ => Token::new(self,TokenType::Error)
+            _ => {
+                self.error_msg = format!("Unkown token at line {} -- starts with character '{}'",self.line,c);
+                Token::new(self,TokenType::Error)
+            }
         }        
     }
 
@@ -421,7 +446,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_advance(){
+    fn test_scanner_advance(){
         let source = vec!['h' as u8, 'e' as u8, 'l' as u8,'l' as u8,'o' as u8];
         
         let mut scan = Scanner::new(&source);
@@ -458,6 +483,22 @@ mod tests {
 
     #[test]
     fn test_scan_single_character(){
+        
+        let raw_source = "".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+        let mut scanner = Scanner::new(&source);
+
+        assert!(scanner.is_at_end());
+
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::EOF => {
+                
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // 
         let raw_source = "(){},.-+;*/".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
         let mut scanner = Scanner::new(&source);
@@ -468,11 +509,11 @@ mod tests {
             TokenType::LeftParen => {
                 assert_eq!(scanner.current_index,1);
                 assert_eq!(scanner.start_index,0);
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
                 let txt = token.source_text(&source);                
                 assert_eq!("(",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -480,11 +521,11 @@ mod tests {
             TokenType::RightParen => {
                 assert_eq!(scanner.current_index,2);
                 assert_eq!(scanner.start_index,1);
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
                 let txt = token.source_text(&source);                
                 assert_eq!(")",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -495,7 +536,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("{",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -506,7 +547,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("}",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -517,7 +558,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!(",",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -528,7 +569,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!(".",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         
         let token = scanner.scan_token();
@@ -539,7 +580,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("-",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -550,7 +591,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("+",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -561,7 +602,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!(";",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         
@@ -574,7 +615,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("*",txt);         
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };    
         
         let token = scanner.scan_token();        
@@ -585,7 +626,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("/",txt);                                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -596,7 +637,7 @@ mod tests {
                 let txt = token.source_text(&source);                
                 assert_eq!("",txt);                                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
     }// End of test_single_char
 
@@ -610,61 +651,61 @@ mod tests {
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Bang => {                
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::BangEqual => {                
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Equal => {                
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::EqualEqual => {
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Greater => {
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::GreaterEqual => {
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Less => {
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::LessEqual => {
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         
     }// end of test_scan_one_or_two_chars()
@@ -683,9 +724,9 @@ mod tests {
             TokenType::LeftParen => {
                 assert_eq!(scanner.current_index,1);
                 assert_eq!(scanner.start_index,0);
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -695,7 +736,7 @@ mod tests {
                 txt.retain(|x| x != '"');
                 assert_eq!(s,txt);                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         /* WITH NEWLINE INSIDE */
@@ -710,9 +751,9 @@ mod tests {
             TokenType::LeftParen => {
                 assert_eq!(scanner.current_index,1);
                 assert_eq!(scanner.start_index,0);
-                debug::debug_token(token, &source);                
+                debug::token(token, &source);                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -724,7 +765,7 @@ mod tests {
                 assert_eq!(token.line(),1);
                 assert_eq!(scanner.line(),2);                          
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
 
@@ -741,9 +782,9 @@ mod tests {
             TokenType::LeftParen => {
                 assert_eq!(scanner.current_index,1);
                 assert_eq!(scanner.start_index,0);
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -753,7 +794,7 @@ mod tests {
                 txt.retain(|x| x != '"');
                 assert_eq!(s,txt);                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
     }// end of test_scan_string()
 
@@ -774,7 +815,7 @@ mod tests {
                 assert_eq!(token.line(),1);
                 assert_eq!(scanner.line(),1);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -783,7 +824,7 @@ mod tests {
                 assert_eq!(token.line(),2);
                 assert_eq!(scanner.line(),2);                               
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
 
@@ -791,7 +832,7 @@ mod tests {
         match token.token_type() {
             TokenType::EOF => {                                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
 
@@ -807,7 +848,7 @@ mod tests {
         match token.token_type() {
             TokenType::EOF => {                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
 
@@ -821,7 +862,7 @@ mod tests {
         match token.token_type() {
             TokenType::LeftParen => {                                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -831,14 +872,14 @@ mod tests {
                 txt.retain(|x| x != '"');
                 assert_eq!(s,txt);                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::EOF => {                                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         
 
@@ -857,9 +898,9 @@ mod tests {
             TokenType::Plus => {
                 assert_eq!(scanner.current_index,1);
                 assert_eq!(scanner.start_index,0);
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -868,14 +909,14 @@ mod tests {
                 let txt = token.source_text(&source);                                
                 assert_eq!(s,txt.parse::<i32>().unwrap());                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Slash => {                                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
     }// end of test_scan_int()
 
@@ -892,9 +933,9 @@ mod tests {
             TokenType::Plus => {
                 assert_eq!(scanner.current_index,1);
                 assert_eq!(scanner.start_index,0);
-                debug::debug_token(token, &source);
+                debug::token(token, &source);
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
@@ -903,14 +944,14 @@ mod tests {
                 let txt = token.source_text(&source);                                
                 assert_eq!(s,txt.parse::<f64>().unwrap());                            
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Slash => {                                
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
     }// end of test_scan_float()
 
@@ -940,7 +981,7 @@ mod tests {
             TokenType::And => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // break
@@ -953,7 +994,7 @@ mod tests {
             TokenType::Break => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // else
@@ -966,7 +1007,7 @@ mod tests {
             TokenType::Else => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // false        
@@ -979,7 +1020,7 @@ mod tests {
             TokenType::False => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // fn
@@ -992,7 +1033,7 @@ mod tests {
             TokenType::Function => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // for
@@ -1005,7 +1046,7 @@ mod tests {
             TokenType::For => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         
         // if
@@ -1018,7 +1059,7 @@ mod tests {
             TokenType::False => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // in 
@@ -1032,7 +1073,7 @@ mod tests {
             TokenType::In => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // let
@@ -1046,7 +1087,7 @@ mod tests {
             TokenType::Let => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // nil 
@@ -1059,7 +1100,7 @@ mod tests {
             TokenType::Nil => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // or
@@ -1073,7 +1114,7 @@ mod tests {
             TokenType::Or => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // return
@@ -1087,7 +1128,7 @@ mod tests {
             TokenType::Return => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // self
@@ -1100,7 +1141,7 @@ mod tests {
             TokenType::TokenSelf => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // true
@@ -1113,7 +1154,7 @@ mod tests {
             TokenType::True => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         
         // while
@@ -1126,7 +1167,7 @@ mod tests {
             TokenType::While => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
 
@@ -1141,7 +1182,7 @@ mod tests {
                 TokenType::Identifier => {                                
     
                 },
-                _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+                _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
             };
             
         }
@@ -1150,7 +1191,7 @@ mod tests {
             TokenType::EOF => {                                
 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // various
@@ -1165,7 +1206,7 @@ mod tests {
             TokenType::While => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         // 2
@@ -1174,7 +1215,7 @@ mod tests {
             TokenType::Number => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
         //the_identifier
@@ -1183,7 +1224,7 @@ mod tests {
             TokenType::Identifier => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
             
         // .
@@ -1192,7 +1233,7 @@ mod tests {
             TokenType::Dot => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
             
         //more
@@ -1201,7 +1242,7 @@ mod tests {
             TokenType::Identifier => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         //e3lements
         let token = scanner.scan_token();
@@ -1209,14 +1250,14 @@ mod tests {
             TokenType::Identifier => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::EOF => {                                
                 
             },
-            _ =>{panic!("Incorrect token ==> {}",debug::debug_token(token, &source))},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
 
 

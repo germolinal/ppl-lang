@@ -20,7 +20,7 @@ pub mod debug {
     /// Disassembles an Operation
     /// # Arguments:
     /// * op: The operation to be unassembled
-    pub fn disasemble_operation(chunk: &Chunk, offset: usize) {        
+    pub fn operation(chunk: &Chunk, offset: usize) {        
         let ops = &chunk.code();
         let op = &ops[offset];
         let ln = chunk.lines()[offset];
@@ -73,19 +73,18 @@ pub mod debug {
     /// Prints the instruction set into the 
     /// terminal... not really used outside of
     /// development environments
-    fn disassemble(chunk : &Chunk, name: String){
+    pub fn chunk(chunk : &Chunk, name: String){
         
         println!("== {} ==\n", name);
     
         for (i,_) in chunk.code().iter().enumerate(){
-            disasemble_operation(chunk,i);
+            operation(chunk,i);
         }
     }
-    
-    /// Prints a token in debug mode
-    pub fn debug_token(token: Token, source:&Vec<u8>) -> String{
-    
-        let token_name = match token.token_type() {
+
+    /// Retreives the token type name
+    pub fn token_type(t : TokenType)->&'static str{
+        match t {
             TokenType::EOF => "TOKEN_EOF",
             TokenType::Error => "TOKEN_ERROR",
             
@@ -123,7 +122,13 @@ pub mod debug {
             TokenType::True => "TRUE",
             TokenType::While => "WHILE",
 
-        };
+        }
+    }
+    
+    /// Retrieves a token in debug mode
+    pub fn token(token: Token, source:&Vec<u8>) -> String{
+    
+        let token_name = token_type(token.token_type());
                 
         format!("{} '{}'", token_name,token.source_text(source) )
     }
@@ -147,7 +152,7 @@ pub mod debug {
             c.write_operation(Operation::Constant(constant_i), 123);                
             c.write_operation(Operation::Return, 0);
             
-            disassemble(&c, "The chunk".to_string());        
+            chunk(&c, "The chunk".to_string());        
         }
     }
 }

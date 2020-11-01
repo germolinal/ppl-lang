@@ -1,7 +1,7 @@
 use crate::chunk::*;
 use crate::operations::*;
 use crate::values::*;
-use crate::compiler::*;
+use crate::parser::*;
 
 #[cfg(test)]
 use crate::debug::*;
@@ -37,7 +37,8 @@ impl <'a>VM<'a> {
     }    
 
     pub fn interpret(&mut self, source : &Vec<u8>) -> InterpretResult {
-        compile(source);        
+        
+        //compile(source);        
         return InterpretResult::Ok;
     }
 
@@ -59,7 +60,7 @@ impl <'a>VM<'a> {
                 print!("]\n");
 
                 // Report operation                
-                debug::disasemble_operation(chunk, _offset);                
+                debug::operation(chunk, _offset);                
             }
             /*****************************/
             /*****************************/

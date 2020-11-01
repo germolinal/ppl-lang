@@ -19,9 +19,9 @@ impl <'a>Chunk<'a> {
     /// Crates a new empty Chunk
     pub fn new()->Self{
         Self{
-            code: Vec::new(),
-            constants: Vec::new(),
-            lines: Vec::new(),
+            code: Vec::with_capacity(1024),
+            constants: Vec::with_capacity(1024),
+            lines: Vec::with_capacity(1024),
         }
     }
 
@@ -29,6 +29,7 @@ impl <'a>Chunk<'a> {
         &self.code
     }
 
+    
     pub fn constants(&self)->&Vec<PPLValue>{
         &self.constants
     }
@@ -36,6 +37,7 @@ impl <'a>Chunk<'a> {
     pub fn lines(&self)->&Vec<usize>{
         &self.lines
     }
+
     
 
     /// Writes an operation into the Chunk
