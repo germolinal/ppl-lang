@@ -75,7 +75,18 @@ impl <'a>VM<'a> {
                     let c = &chunk.constants()[*c_index];
                     self.push(*c)                    
                 },
-
+                Operation::PushBool(v)=>{
+                    self.push(PPLValue::PPLBool(*v))
+                },
+                Operation::PushNil=>{
+                    self.push(PPLValue::PPLNil)
+                },
+                Operation::PushInt(v)=>{
+                    self.push(PPLValue::PPLInt(*v))
+                },
+                Operation::PushFloat(v)=>{
+                    self.push(PPLValue::PPLFloat(*v))
+                },
                 // Unary operations
                 Operation::Negate =>{
                     let value = self.pop();// This panics if there is nothing there
@@ -199,6 +210,96 @@ impl <'a>VM<'a> {
                         },
                         _ => return InterpretResult::RuntimeError(format!("Trying to divide over type '{}'", value_b.ppl_type()))                        
                     }                    
+                },
+                Operation::Equal => {
+                    let value_b = self.pop();
+                    match value_b {
+                        PPLValue::PPLFloat(b)=>{
+                            let value_a = self.pop();
+                            match value_a {
+                                PPLValue::PPLFloat(a)=>{
+                                    self.push(PPLValue::PPLBool(a == b));
+                                },
+                                PPLValue::PPLInt(a)=>{
+                                    self.push(PPLValue::PPLBool(a as f64 == b));
+                                },
+                                _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_a.ppl_type()))
+                            }      
+                        },
+                        PPLValue::PPLInt(b)=>{
+                            let value_a = self.pop();
+                            match value_a {
+                                PPLValue::PPLFloat(a)=>{
+                                    self.push(PPLValue::PPLBool(a == b as f64));
+                                },
+                                PPLValue::PPLInt(a)=>{
+                                    self.push(PPLValue::PPLBool(a == b));
+                                },
+                                _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_a.ppl_type()))
+                            } 
+                        },
+                        _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_b.ppl_type()))
+                    }                                        
+                },
+                Operation::Greater => {
+                    let value_b = self.pop();
+                    match value_b {
+                        PPLValue::PPLFloat(b)=>{
+                            let value_a = self.pop();
+                            match value_a {
+                                PPLValue::PPLFloat(a)=>{
+                                    self.push(PPLValue::PPLBool(a > b));
+                                },
+                                PPLValue::PPLInt(a)=>{
+                                    self.push(PPLValue::PPLBool(a as f64 > b));
+                                },
+                                _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_a.ppl_type()))
+                            }      
+                        },
+                        PPLValue::PPLInt(b)=>{
+                            let value_a = self.pop();
+                            match value_a {
+                                PPLValue::PPLFloat(a)=>{
+                                    self.push(PPLValue::PPLBool(a > b as f64));
+                                },
+                                PPLValue::PPLInt(a)=>{
+                                    self.push(PPLValue::PPLBool(a > b));
+                                },
+                                _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_a.ppl_type()))
+                            } 
+                        },
+                        _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_b.ppl_type()))
+                    } 
+                },
+                Operation::Less => {
+                    let value_b = self.pop();
+                    match value_b {
+                        PPLValue::PPLFloat(b)=>{
+                            let value_a = self.pop();
+                            match value_a {
+                                PPLValue::PPLFloat(a)=>{
+                                    self.push(PPLValue::PPLBool(a < b));
+                                },
+                                PPLValue::PPLInt(a)=>{
+                                    self.push(PPLValue::PPLBool( (a as f64) < b));
+                                },
+                                _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_a.ppl_type()))
+                            }      
+                        },
+                        PPLValue::PPLInt(b)=>{
+                            let value_a = self.pop();
+                            match value_a {
+                                PPLValue::PPLFloat(a)=>{
+                                    self.push(PPLValue::PPLBool(a < b as f64));
+                                },
+                                PPLValue::PPLInt(a)=>{
+                                    self.push(PPLValue::PPLBool(a < b));
+                                },
+                                _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_a.ppl_type()))
+                            } 
+                        },
+                        _ => return InterpretResult::RuntimeError(format!("Trying to compare type '{}'", value_b.ppl_type()))
+                    } 
                 }
 
             }

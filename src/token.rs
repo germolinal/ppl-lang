@@ -44,7 +44,7 @@ pub enum TokenType{
 pub struct Token {
     line: usize,    
     length: usize,
-    start: *const u8,   
+    start: usize,   
     token_type: TokenType 
 }
 
@@ -53,7 +53,7 @@ impl Token{
         Self {
             line: scanner.line(),
             length: scanner.current_index() - scanner.start_index(),
-            start: scanner.start().clone(),
+            start: scanner.start_index(),
             token_type: token_type            
         }
     }
@@ -61,7 +61,7 @@ impl Token{
         Self {
             line: line,
             length: scanner.current_index() - scanner.start_index(),
-            start: scanner.start().clone(),
+            start: scanner.start_index(),
             token_type: token_type            
         }
     }
@@ -77,18 +77,19 @@ impl Token{
     pub fn source_text(&self, source: &Vec<u8>)->String{
 
         // Copy start.
-        let mut start = self.start.clone();
-        let mut v : Vec<char> = Vec::new();
+        let ini = self.start;
+        let fin = self.length + ini;
+        match source.get(ini..fin){
+            Some(v)=>{            
+                let mut s : Vec<u8> = Vec::with_capacity(v.len());
+                for b in v.iter(){
+                    s.push(*b);
+                }
 
-        for _ in 0..self.length{
-            unsafe{
-                v.push(*start as char);
-                start = start.add(1)
-            }
-        }
-        
-        let s : String = v.into_iter().collect();        
-        return s;
+                return String::from_utf8(s).unwrap();
+            },
+            None => panic!("Internal error... could not source text for token")
+        }        
 
     }
 }
@@ -104,7 +105,7 @@ mod tests {
         let token = Token{
             line: 1,
             length: 2,
-            start: src.as_ptr(),            
+            start: 0,            
             token_type: TokenType::EOF,
         };
 

@@ -12,6 +12,13 @@ pub enum Operation {
     Subtract,
     Multiply,
     Divide,
+    PushNil,
+    PushBool(bool),
+    PushFloat(f64),
+    PushInt(i32),
+    Equal,
+    Greater,
+    Less,
 }
 /*
 impl Clone for Operation {

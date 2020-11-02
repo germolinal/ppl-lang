@@ -6,11 +6,7 @@ use crate::token::*;
 
 pub struct Scanner<'a> {
     
-    /// A pointer to the 
-    start : *const u8, // Raw pointer
-
-    current : *const u8, // Raw pointer
-
+        
     line : usize,    
 
     source: &'a Vec<u8>,
@@ -20,18 +16,19 @@ pub struct Scanner<'a> {
     start_index: usize,
 
     error_msg: String,
+    
+    finished: bool
 }
 
 impl <'a>Scanner<'a> {
     
     pub fn new(source : &'a Vec<u8>)->Self{
         Self {
-            line: 1,            
-            start: source.as_ptr(),            
-            current: source.as_ptr(),
+            line: 1,                        
             source: source,
             current_index: 0,
             start_index: 0,
+            finished: source.len() == 0,
             error_msg : "".to_string(),
         }
     }
@@ -57,136 +54,147 @@ impl <'a>Scanner<'a> {
         self.start_index
     }
 
+    /*
     pub fn start(&self)-> *const u8{
         self.start
     }
+    */
 
-    unsafe fn match_char(&mut self, expected : char)->bool{
-        if self.is_at_end(){
+    fn match_char(&mut self, expected : char)->bool{
+        if self.finished {
             return false;
         }
         
-        let c = *self.current as char;
+        let c = self.source[self.current_index] as char;
         if c != expected {
             return false
         }
 
-        self.current = self.current.add(1);
+        self.current_index += 1;//self.current.add(1);
         return true;
-        
-        
+                
     }
 
-    unsafe fn advance (&mut self )->Option<char>{
-        // Check if this is done
-        if self.is_at_end() {
-            return None;
+    pub fn advance (&mut self )->Option<char>{
+        let c = self.source.get(self.current_index);
+
+        match c {
+            Some(v)=>{
+                self.current_index += 1;
+                if self.current_index == self.source().len(){
+                    self.finished = true;
+                }
+                return Some(*v as char)
+            },
+            None => {
+                self.finished = true;
+                None      
+            }
         }
-        let ret = *self.current;
-        self.current = self.current.add(1);
-        self.current_index += 1;
-        return Some(ret as char);
+        
     }
 
+    
     fn is_at_end(&self)->bool{    
-        self.current_index == self.source.len()
+        //self.current_index == self.source.len()
+        self.finished
     }
-
-    unsafe fn peek(&self)->char{
-        *self.current as char
-    }
-
-    unsafe fn peek_next(&self)->char{
-        if self.is_at_end(){
+    
+    fn peek(&self)->char{
+        if self.finished {
             return '\0';
         }
-        return *self.current.clone().add(1) as char;
+        self.source[self.current_index] as char
+    }
+
+    fn peek_next(&self)->char{
+        if self.finished || self.current_index + 1 == self.source.len() {
+            return '\0';
+        }
+        
+        return self.source[self.current_index+1] as char;// .clone().add(1) as char;
         
     }
 
     fn skip_white_space(&mut self){
         
         // Prevent segfault
-        if self.is_at_end(){
+        if self.finished{
             return;
         }
 
         loop {            
-            unsafe{
-                match self.peek(){
-                    ' ' => {self.advance().unwrap();},
-                    '\r' => {self.advance().unwrap();},
-                    '\t' => {self.advance().unwrap();},
-                    '\n' => {
-                        self.line += 1;
-                        self.advance().unwrap();
-                    },
-                    '/' => {                        
-                        if self.peek_next() == '/'{
-                            // Single line comment
-                            while self.peek() != '\n' && !self.is_at_end() {
-                                self.advance().unwrap();
-                            }
-
-                        }else if self.peek_next() == '*'{
-                            // Consume slash and star
-                            self.advance();
-                            self.advance();
-                            // Block comment
-                            loop {                                
-                                // Check if it is end
-                                if self.is_at_end(){                                    
-                                    return;
-                                }
-
-                                // Check if end of blovk comment
-                                if self.peek() == '*' && self.peek_next() == '/' {                                    
-                                    // Consume slash and star
-                                    self.advance();
-                                    self.advance();
-                                    return;
-                                }
-                                match self.advance().unwrap(){
-                                    '\n' => {
-                                        self.line += 1;
-                                        self.advance().unwrap();
-                                    },
-                                    _ =>{}
-                                };
-                            }
-                        }else{
-                            return;
+            
+            match self.peek(){
+                ' '  => {self.advance().unwrap();},
+                '\r' => {self.advance().unwrap();},
+                '\t' => {self.advance().unwrap();},
+                '\n' => {
+                    self.line += 1;
+                    self.advance().unwrap();
+                },
+                '/' => {                        
+                    if self.peek_next() == '/'{
+                        // Single line comment
+                        while self.peek() != '\n' && !self.finished {
+                            self.advance().unwrap();
                         }
+
+                    }else if self.peek_next() == '*'{
+                        // Consume slash and star
+                        self.advance();
+                        self.advance();
+                        // Block comment
+                        loop {                                
+                            // Check if it is end
+                            if self.finished{                                    
+                                return;
+                            }
+
+                            // Check if end of blovk comment
+                            if self.peek() == '*' && self.peek_next() == '/' {                                    
+                                // Consume slash and star
+                                self.advance();
+                                self.advance();
+                                return;
+                            }
+                            match self.advance().unwrap(){
+                                '\n' => {
+                                    self.line += 1;
+                                    self.advance().unwrap();
+                                },
+                                _ =>{}
+                            };
+                        }
+                    }else{
+                        return;
                     }
-                    _ => return ()
-                };
-            }
+                }
+                _ => return ()
+            };
+            
         }
     }
 
     fn string(&mut self)->Token{        
         // Token will have this line reported
         let start_line = self.line;
-
-        let mut next : char;
-        unsafe{            
-            next = self.peek();
-        }
+                      
+        let mut next = self.peek();
+        
 
         // Advance as much as possible
-        while next != '"' && !self.is_at_end(){                        
+        while next != '"' && !self.finished{                        
             if next == '\n' {
                 self.line +=1 ;                
-            }
-            unsafe{
-                next = match self.advance(){
-                    Some(v) => v,
-                    None => {
-                        self.error_msg = format!("Unterminated string, started at line {}", start_line);
-                        return Token::new(self,TokenType::Error)
-                    }
-                };
-            }
+            }            
+            next = match self.advance(){
+                Some(v) => v,
+                None => {
+                    self.error_msg = format!("Unterminated string, started at line {}", start_line);
+                    return Token::new(self,TokenType::Error)
+                }
+            };            
         }
         
 
@@ -194,130 +202,130 @@ impl <'a>Scanner<'a> {
     }
 
     fn number(&mut self)->Token{        
-        unsafe{
-            // Scan the first part
-            while self.peek().is_ascii_digit(){            
-                self.advance();            
-            }
-            if self.peek()=='.' && self.peek_next().is_ascii_digit(){            
-                // Consume the .            
-                self.advance();
-                while self.peek().is_ascii_digit() {                
-                    self.advance();                
-                }        
-            }
+        
+        // Scan the first part
+        while self.peek().is_ascii_digit(){            
+            self.advance();            
         }
+        if self.peek()=='.' && self.peek_next().is_ascii_digit(){            
+            // Consume the .            
+            self.advance();
+            while self.peek().is_ascii_digit() {                
+                self.advance();                
+            }        
+        }
+        
 
         Token::new(self,TokenType::Number)
         
     }
 
     fn identifier(&mut self)->Token{        
-        unsafe{
-
-            // scan the whole thing.            
-            let mut c = self.peek();
-            while c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_' {
-                match self.advance(){
-                    Some(_) => {c = self.peek()},
-                    None => return Token::new(self,TokenType::EOF)
-                }
+        
+        // scan the whole thing.            
+        let mut c = self.peek();
+        while c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_' {
+            match self.advance(){
+                Some(_) => {c = self.peek()},
+                None => return Token::new(self,TokenType::EOF)
             }
-
-            let mut c = self.start.clone();
-            match *c as char {
-                'a' => { // break
-                    if self.check_keyword("and"){
-                        return Token::new(self,TokenType::And);
-                    };
-                },
-                'b' => { // break
-                    if self.check_keyword("break"){
-                        return Token::new(self,TokenType::Break);
-                    };
-                },
-                'e' => { // else
-                    if self.check_keyword("else"){
-                        return Token::new(self,TokenType::Else);
-                    }
-                },
-                'f' => {  
-                    c = c.add(1);
-                    match *c as char {
-                        'a' => {// false
-                            if self.check_keyword("false"){
-                                return Token::new(self,TokenType::False);
-                            }
-                        },                
-                        'n' => {// fn
-                            if self.check_keyword("fn"){
-                                return Token::new(self,TokenType::Function);
-                            }
-                        },              
-                        'o' => {// for
-                            if self.check_keyword("for"){
-                                return Token::new(self,TokenType::For);
-                            }
-                        },
-                        _ => return Token::new(self,TokenType::Identifier)                        
-                    }
-                },
-                'i' => {
-                    c = c.add(1);
-                    match *c as char {
-                        'f' => {// if
-                            if self.check_keyword("if"){
-                                return Token::new(self,TokenType::If);
-                            }
-                        },                
-                        'n' => {// in
-                            if self.check_keyword("in"){
-                                return Token::new(self,TokenType::In);
-                            }
-                        },
-                        _ => return Token::new(self,TokenType::Identifier)                        
-                    }
-                },
-                'l' => { // let
-                    if self.check_keyword("let"){
-                        return Token::new(self,TokenType::Let);
-                    }
-                },
-                'n' => {//nil
-                    if self.check_keyword("nil"){
-                        return Token::new(self,TokenType::Nil);
-                    }
-                },
-                'o' => {//nil
-                    if self.check_keyword("or"){
-                        return Token::new(self,TokenType::Or);
-                    }
-                },
-                'r' => { // return
-                    if self.check_keyword("return"){
-                        return Token::new(self,TokenType::Return);
-                    }
-                },
-                's' => {//self
-                    if self.check_keyword("self"){
-                        return Token::new(self,TokenType::TokenSelf);
-                    }
-                },
-                't' => {//true
-                    if self.check_keyword("true"){
-                        return Token::new(self,TokenType::True);
-                    }
-                },
-                'w' => {//while
-                    if self.check_keyword("while"){
-                        return Token::new(self,TokenType::While);
-                    }
-                },
-                _ => return Token::new(self,TokenType::Identifier)                        
-            }
-            // If not a keyword,
-            return Token::new(self,TokenType::Identifier);                        
         }
+
+        let mut c = self.source[self.start_index];//self.start.clone();
+        match c as char {
+            'a' => { // break
+                if self.check_keyword("and"){
+                    return Token::new(self,TokenType::And);
+                };
+            },
+            'b' => { // break
+                if self.check_keyword("break"){
+                    return Token::new(self,TokenType::Break);
+                };
+            },
+            'e' => { // else
+                if self.check_keyword("else"){
+                    return Token::new(self,TokenType::Else);
+                }
+            },
+            'f' => {  
+                c = self.source[self.start_index+1];//c.add(1);
+                match c as char {
+                    'a' => {// false
+                        if self.check_keyword("false"){
+                            return Token::new(self,TokenType::False);
+                        }
+                    },                
+                    'n' => {// fn
+                        if self.check_keyword("fn"){
+                            return Token::new(self,TokenType::Function);
+                        }
+                    },              
+                    'o' => {// for
+                        if self.check_keyword("for"){
+                            return Token::new(self,TokenType::For);
+                        }
+                    },
+                    _ => return Token::new(self,TokenType::Identifier)                        
+                }
+            },
+            'i' => {
+                //c = c.add(1);
+                c = self.source[self.start_index+1];//c.add(1);
+                match c as char {
+                    'f' => {// if
+                        if self.check_keyword("if"){
+                            return Token::new(self,TokenType::If);
+                        }
+                    },                
+                    'n' => {// in
+                        if self.check_keyword("in"){
+                            return Token::new(self,TokenType::In);
+                        }
+                    },
+                    _ => return Token::new(self,TokenType::Identifier)                        
+                }
+            },
+            'l' => { // let
+                if self.check_keyword("let"){
+                    return Token::new(self,TokenType::Let);
+                }
+            },
+            'n' => {//nil
+                if self.check_keyword("nil"){
+                    return Token::new(self,TokenType::Nil);
+                }
+            },
+            'o' => {//nil
+                if self.check_keyword("or"){
+                    return Token::new(self,TokenType::Or);
+                }
+            },
+            'r' => { // return
+                if self.check_keyword("return"){
+                    return Token::new(self,TokenType::Return);
+                }
+            },
+            's' => {//self
+                if self.check_keyword("self"){
+                    return Token::new(self,TokenType::TokenSelf);
+                }
+            },
+            't' => {//true
+                if self.check_keyword("true"){
+                    return Token::new(self,TokenType::True);
+                }
+            },
+            'w' => {//while
+                if self.check_keyword("while"){
+                    return Token::new(self,TokenType::While);
+                }
+            },
+            _ => return Token::new(self,TokenType::Identifier)                        
+        }
+        // If not a keyword,
+        return Token::new(self,TokenType::Identifier);                        
+        
     }
     
     fn check_keyword(&self, word: &str)-> bool {
@@ -330,34 +338,32 @@ impl <'a>Scanner<'a> {
             return false;
         }
 
-        unsafe{            
-            let mut c = self.start;            
-            
-            // For each character in keyword
-            for ch in word.bytes() {                                                
-                if *c != ch {
-                    return false;
-                }
-                
-                // Move one char ahead
-                c = c.add(1);                
-            }
-        }// end of unsafe
+                  
+              
+        let mut i = self.start_index;
+        // For each character in keyword
+        for ch in word.bytes() {                                                
+            if self.source[i] != ch {
+                return false;
+            }            
+            // Move one char ahead
+            i+=1;
+        }
+        
         return true
     }
 
     pub fn scan_token(&mut self) -> Token {
         self.skip_white_space();
-        self.start = self.current.clone();        
-        self.start_index = self.current_index;
 
-        let c : char; 
-        unsafe {
-            c = match self.advance(){
-                Some(v)=>v,                
-                None=>return Token::new(self, TokenType::EOF)
-            };
-        }
+        //self.start = self.current.clone();        
+        self.start_index = self.current_index;
+                
+        let c = match self.advance(){
+            Some(v)=>v,                
+            None=> return Token::new(self, TokenType::EOF)
+        };
+        
 
         // Alphabetic or underscore allowed
         if c.is_ascii_alphabetic() || c == '_'{
@@ -386,48 +392,52 @@ impl <'a>Scanner<'a> {
             
             // Single or Double char
             '!' => {  
-                unsafe{              
-                    if self.match_char('=') {
-                        Token::new(self,TokenType::BangEqual)
-                    }else{
-                        Token::new(self,TokenType::Bang)
-                    }
-                }                
+                
+                if self.match_char('=') {
+                    Token::new(self,TokenType::BangEqual)
+                }else{
+                    Token::new(self,TokenType::Bang)
+                }
+                            
             },
             '=' => {
-                unsafe{
-                    if self.match_char('=') {
-                        Token::new(self,TokenType::EqualEqual)
-                    }else{
-                        Token::new(self,TokenType::Equal)
-                    }
+                
+                if self.match_char('=') {
+                    Token::new(self,TokenType::EqualEqual)
+                }else{
+                    Token::new(self,TokenType::Equal)
                 }
+                
             },
             '>' => {
-                unsafe{
-                    if self.match_char('=') {
-                        Token::new(self,TokenType::GreaterEqual)
-                    }else{
-                        Token::new(self,TokenType::Greater)
-                    }
+                if self.match_char('=') {
+                    Token::new(self,TokenType::GreaterEqual)
+                }else{
+                    Token::new(self,TokenType::Greater)
                 }
+                
             },
             '<' => {
-                unsafe{
-                    if self.match_char('=') {
-                        Token::new(self,TokenType::LessEqual)
-                    }else{
-                        Token::new(self,TokenType::Less)
-                    }
+                
+                if self.match_char('=') {
+                    Token::new(self,TokenType::LessEqual)
+                }else{
+                    Token::new(self,TokenType::Less)
                 }
-            }
+                
+            },
 
             // String
-            '"' => {return self.string();}
+            '"' => {return self.string();},
+
+            '\0' =>{
+                return Token::new(self,TokenType::EOF)
+            },
+
 
             // Error            
             _ => {
-                self.error_msg = format!("Unkown token at line {} -- starts with character '{}'",self.line,c);
+                self.error_msg = format!("Unexpected character at line {} -- starts with character '{}' (char {} out of {}) {}",self.line,c, self.current_index(), self.source.len(), c as u8);
                 Token::new(self,TokenType::Error)
             }
         }        
@@ -452,33 +462,33 @@ mod tests {
         let mut scan = Scanner::new(&source);
 
         assert_eq!(scan.line,1);        
-        unsafe{
-            assert_eq!(*scan.start, source[scan.start_index]);
-            assert_eq!(*scan.current, source[scan.current_index]);
+        
+        assert_eq!(scan.source[scan.start_index], source[scan.start_index]);
+        assert_eq!(scan.source[scan.current_index], source[scan.current_index]);
 
-            for i in 0..source.len() {
-                
-                assert_eq!(scan.current_index,i);
-                assert_eq!(scan.current_index(),i);
+        for i in 0..source.len() {
+            
+            assert_eq!(scan.current_index,i);
+            assert_eq!(scan.current_index(),i);
 
-                let c = match scan.advance(){
-                    Some(v)=>v,
-                    None => panic!("PANIC!!")
-                };                
+            let c = match scan.advance(){
+                Some(v)=>v,
+                None => panic!("PANIC!!")
+            };                
 
-                assert_eq!(c, source[i] as char);
+            assert_eq!(c, source[i] as char);
 
 
 
-            }
-
-            assert_eq!(scan.current_index,source.len());
-            assert_eq!(scan.current_index(),source.len());
-            match scan.advance(){
-                Some(v)=>panic!("Retrieved {}... should not have", v),
-                None => assert!(true)
-            };
         }
+
+        assert_eq!(scan.current_index,source.len());
+        assert_eq!(scan.current_index(),source.len());
+        match scan.advance(){
+            Some(v)=>panic!("Retrieved {}... should not have", v),
+            None => assert!(true)
+        };
+        
     }
 
     #[test]
@@ -488,7 +498,7 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
         let mut scanner = Scanner::new(&source);
 
-        assert!(scanner.is_at_end());
+        assert!(scanner.finished);
 
         let token = scanner.scan_token();
         match token.token_type() {

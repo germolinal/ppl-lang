@@ -8,13 +8,19 @@ pub mod debug {
         //return offset + 1;
     }
     
-    fn constant_instruction(name: &str, chunk: &Chunk, _offset: usize, c_index: usize) {    
+    fn constant_instruction(name: &str, chunk: &Chunk, c_index: usize) {    
         let cons = chunk.constants();
-        //let c_index = ops[offset+1].clone() as usize;
         let c = &cons[c_index];
     
-        println!("{}\tconst {} | '{}'", name,c_index, c.to_string()); 
-        //return offset+2;           
+        println!("{}\tconst {} | '{}'", name,c_index, c.to_string());              
+    }
+
+    fn push_float_instruction(c : f64) {            
+        println!("OP_PUSH_FLOAT | '{}'", c);         
+    }
+
+    fn push_int_instruction(c : i32) {            
+        println!("OP_PUSH_INT | '{}'", c);         
     }
     
     /// Disassembles an Operation
@@ -40,7 +46,7 @@ pub mod debug {
             },
     
             Operation::Constant(c_index) => {
-                return constant_instruction(&"OP_CONSTANT", chunk, offset, *c_index);
+                return constant_instruction(&"OP_CONSTANT", chunk, *c_index);
             },
     
             Operation::Negate => {
@@ -65,6 +71,39 @@ pub mod debug {
             
             Operation::Divide => {
                 return simple_instruction("OP_DIVIDE", offset);
+            }
+            ,
+
+            Operation::PushNil => {
+                return simple_instruction("OP_PUSH_NIL", offset );
+            },
+
+            Operation::PushBool(b) => {
+                if *b {
+                    return simple_instruction("OP_PUSH_TRUE", offset );
+                }else{
+                    return simple_instruction("OP_PUSH_FALSE", offset );
+                }
+            },
+
+            Operation::PushFloat(v)=>{
+                return push_float_instruction(*v)
+            },
+
+            Operation::PushInt(v)=>{
+                return push_int_instruction(*v);
+            },
+
+            Operation::Equal => {
+                return simple_instruction("OP_EQUAL", offset );
+            },
+
+            Operation::Greater => {
+                return simple_instruction("OP_GREATER", offset );
+            },
+
+            Operation::Less => {
+                return simple_instruction("OP_LESS", offset );
             }
         }
         

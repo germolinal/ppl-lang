@@ -61,6 +61,7 @@ impl <'a>Parser<'a>{
 
     pub fn compile(&mut self) -> bool {        
         self.advance();
+
         self.expression();
 
         
@@ -76,13 +77,14 @@ impl <'a>Parser<'a>{
     }
     
     fn advance(&mut self){
-        self.previous = self.current;
+        self.previous = self.current;        
         self.current = self.scanner.scan_token();
         loop{
             match self.current.token_type(){
                 TokenType::Error => {
                     let msg = self.scanner.error_msg();
                     self.error_at_current(msg);
+                    break;
                 },
                 _ => break
             }
@@ -132,8 +134,7 @@ impl <'a>Parser<'a>{
             TokenType::Return |
             TokenType::Let | 
             TokenType::While | 
-            TokenType::EOF | TokenType::Error 
-            
+            TokenType::EOF | TokenType::Error             
             => {
                 ParseRule{
                     prefix:None,
@@ -182,6 +183,14 @@ impl <'a>Parser<'a>{
                     infix: Some(binary),
                 }
             },
+            TokenType::Bang => {
+                ParseRule{
+                    precedence: Precedence::None,
+                    next_precedence: Some(Precedence::Assignment),
+                    prefix: Some(unary),
+                    infix: None
+                }
+            },
             TokenType::Slash => {
                 ParseRule{
                     precedence: Precedence::Factor,
@@ -190,6 +199,30 @@ impl <'a>Parser<'a>{
                     infix: Some(binary),
                 }
             },
+            TokenType::True |TokenType::False | TokenType::Nil => {
+                ParseRule{
+                    precedence: Precedence::None,
+                    next_precedence: Some(Precedence::Assignment),
+                    prefix: Some(literal),
+                    infix: None,
+                }
+            },
+            TokenType::BangEqual | TokenType::EqualEqual =>{
+                ParseRule{
+                    precedence: Precedence::Equality,
+                    next_precedence: Some(Precedence::Comparison),
+                    prefix: None,
+                    infix: Some(binary),
+                }
+            },
+            TokenType::Greater | TokenType::GreaterEqual | TokenType::Less | TokenType::LessEqual => {
+                ParseRule{
+                    precedence: Precedence::Comparison,
+                    next_precedence: Some(Precedence::Term),
+                    prefix: None,
+                    infix: Some(binary),
+                }
+            } 
             _ => {
                 println!(" ===> {}",debug::token_type(ttype));
                 unimplemented!()
@@ -344,9 +377,9 @@ mod tests {
             _ => {panic!("Expecting Number, found {}", debug::token(parser.previous, parser.scanner.source()))}
         }
         
-        number(&mut parser);
-        if let PPLValue::PPLInt(found) = parser.chunk.constants()[0] {            
-            assert_eq!(2,found);            
+        number(&mut parser);        
+        if let Operation::PushInt(found) = parser.chunk.code().last().unwrap() {            
+            assert_eq!(2,*found);            
         }else{
             assert!(false);
         }
@@ -365,8 +398,9 @@ mod tests {
         }
         
         number(&mut parser);
-        if let PPLValue::PPLFloat(found) = parser.chunk.constants()[0] {            
-            assert_eq!(2.1,found);            
+        number(&mut parser);        
+        if let Operation::PushFloat(found) = parser.chunk.code().last().unwrap() {            
+            assert_eq!(2.1,*found);            
         }else{
             assert!(false);
         }
@@ -375,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_add_expression(){
-        let raw_source = "1*(3+2)/4".to_string();
+        let raw_source = "!(5 - 4 > 3 * 2 2 == !nil 3*2".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);

@@ -18,8 +18,11 @@ pub fn unary(parser: &mut Parser){
         TokenType::Minus => {
             parser.emit_byte(Operation::Negate);
         },
+        TokenType::Bang => {
+            parser.emit_byte(Operation::Not);
+        },
         _ => {
-            unreachable!()
+            parser.internal_error_at_current(format!("Unknown Token in unary()")) 
         }
     };
 }
@@ -34,8 +37,9 @@ pub fn number(parser: &mut Parser){
                 return parser.error_at_current(msg.to_string());
             }
         };
-        let index = parser.add_constant(PPLValue::PPLFloat(the_v));                        
-        parser.emit_byte(Operation::Constant(index));
+        //let index = parser.add_constant(PPLValue::PPLFloat(the_v));                        
+        //parser.emit_byte(Operation::Constant(index));
+        parser.emit_byte(Operation::PushFloat(the_v));
         
     }else{
         let the_v = match v.parse::<i32>(){
@@ -44,8 +48,9 @@ pub fn number(parser: &mut Parser){
                 return parser.error_at_current(msg.to_string());
             }
         };
-        let index = parser.add_constant(PPLValue::PPLInt(the_v));                        
-        parser.emit_byte(Operation::Constant(index));
+        //let index = parser.add_constant(PPLValue::PPLInt(the_v));                        
+        //parser.emit_byte(Operation::Constant(index));
+        parser.emit_byte(Operation::PushInt(the_v));
 
     }
 }
@@ -53,8 +58,8 @@ pub fn number(parser: &mut Parser){
 pub fn grouping(parser: &mut Parser){
     // left paren has been consumed
     parser.expression();
-    if parser.consume(TokenType::RightParen){
-        parser.error_at_current(format!("Expected '(' after expression"));
+    if !parser.consume(TokenType::RightParen) {
+        parser.error_at_current(format!("Expected ')' after expression"));
     }
 }
 
@@ -84,7 +89,38 @@ pub fn binary(parser: &mut Parser){
         TokenType::Slash => {
             parser.emit_byte(Operation::Divide)
         },
+
+        TokenType::EqualEqual => {
+            parser.emit_byte(Operation::Equal)
+        },
+        TokenType::BangEqual => {
+            parser.emit_byte(Operation::Equal);
+            parser.emit_byte(Operation::Not)
+        },
+        TokenType::Greater =>{
+            parser.emit_byte(Operation::Greater)
+        },
+        TokenType::GreaterEqual=>{
+            parser.emit_byte(Operation::Less);
+            parser.emit_byte(Operation::Not);
+        },
+        TokenType::Less =>{
+            parser.emit_byte(Operation::Less);
+        },
+        TokenType::LessEqual => {
+            parser.emit_byte(Operation::Greater);
+            parser.emit_byte(Operation::Not);
+        },
         _ => parser.internal_error_at_current(format!("Unknown Token for Binary operation"))
     }
     
+}
+
+pub fn literal(parser: &mut Parser){
+    match parser.previous().token_type(){
+        TokenType::False => parser.emit_byte(Operation::PushBool(false)),
+        TokenType::True => parser.emit_byte(Operation::PushBool(true)),
+        TokenType::Nil => parser.emit_byte(Operation::PushNil),
+        _ => parser.internal_error_at_current(format!("Unknown Token in literal()")) 
+    }
 }
