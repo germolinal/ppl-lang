@@ -31,7 +31,7 @@ impl <'a>VM<'a> {
     pub fn new()-> Self{
                     
         Self{
-            stack: [Value::new_nil(); 256],
+            stack: [Value::Nil; 256],
             stack_top:0,
         }
     }    

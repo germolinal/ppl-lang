@@ -19,6 +19,7 @@ impl Object {
     }
 }
 
+/*
 #[derive(Copy,Clone)]
 pub struct Value<'a>{
     value_type: ValueType,
@@ -26,74 +27,83 @@ pub struct Value<'a>{
     boolean : Option<bool>,
     object: Option<&'a Object>
 }
+*/
+#[derive(Copy,Clone)]
+pub enum Value<'a>{
+    Number(Option<f64>),          
+    Bool(Option<bool>),    
+    Object(Option<&'a Object>),
+    Nil,
+}
 
 impl <'a>Value<'a> {
 
     /// Constructs a Nil 
     pub fn new_nil()->Self{
-        Self{
-            value_type: ValueType::Nil,
-            number: None,
-            boolean: None,
-            object: None,
-        }
+        Value::Nil
     }
 
     /// Constructs a number
     pub fn new_number(v: f64)->Self{
-        Self{
-            value_type: ValueType::Number,
-            number: Some(v),
-            boolean: None,
-            object: None,
-        }
+        Value::Number(Some(v))
     }
 
 
     /// Constructs a boolean
     pub fn new_bool(v: bool)->Self{
-        Self{
-            value_type: ValueType::Bool,
-            number: None,
-            boolean: Some(v),
-            object: None,
-        }
+        Value::Bool(Some(v))
     }
 
     /// Constructs an Object
     pub fn new_object(v: &'a Object)->Self{
-        Self{
-            value_type: ValueType::Object,
-            number: None,
-            boolean: None,
-            object: Some(v),
-        }
+        Value::Object(Some(v))
+    }
+
+    /// Constructs a number
+    pub fn new_empty_number()->Self{
+        Value::Number(None)
+    }
+
+
+    /// Constructs a boolean
+    pub fn new_empty_bool()->Self{
+        Value::Bool(None)
+    }
+
+    /// Constructs an Object
+    pub fn new_empty_object()->Self{
+        Value::Object(None)
     }
 
     /// Gets the type of the value as a String 
     /// This is for giving feedback to the user... not 
     /// for internal use.
     pub fn typename(&self)-> &str {
-        match self.value_type{            
-            ValueType::Number => "Number",            
-            ValueType::Bool => "Boolean",
-            ValueType::Object => "Object",                
-            ValueType::Nil => "Nil"
+        match self {            
+            Value::Number(_) => "Number",            
+            Value::Bool(_) => "Boolean",
+            Value::Object(_) => "Object",                
+            Value::Nil => "Nil"
         }
     }
 
     /// Retrieves the ValueType
     pub fn value_type(&self)->ValueType{
-        self.value_type
+        match self {            
+            Value::Number(_) => ValueType::Number,            
+            Value::Bool(_) => ValueType::Bool,
+            Value::Object(_) => ValueType::Object,                
+            Value::Nil => ValueType::Nil
+        }
     }
 
     /// Retrieves the number contained within the 
     /// value, returns a Result.
     pub fn unrwap_number(&self)->Result<f64, String>{
-        match self.value_type {
-            ValueType::Number => {
-                match self.number {
-                    Some(v)=>Ok(v),
+        match self {
+            Value::Number(v) => {
+                match v {
+                    Some(v2)=>Ok(*v2),
                     None => Err(format!("Trying to get a number out of an uninitialized 'Number' variable"))
                 }
             },
@@ -104,10 +114,10 @@ impl <'a>Value<'a> {
     /// Retrieves the boolean contained within the 
     /// value, returns a Result.
     pub fn unrwap_boolean(&self)->Result<bool, String>{
-        match self.value_type {
-            ValueType::Bool => {
-                match self.boolean {
-                    Some(v)=>Ok(v),
+        match self {
+            Value::Bool(v) => {
+                match v {
+                    Some(v2)=>Ok(*v2),
                     None => Err(format!("Trying to get a boolean out of an uninitialized 'Boolean' variable"))
                 }
             },
@@ -118,10 +128,10 @@ impl <'a>Value<'a> {
     /// Retrieves the boolean contained within the 
     /// value, returns a Result.
     pub fn unrwap_object(&self)->Result<&Object, String>{
-        match self.value_type {
-            ValueType::Object => {
-                match self.object {
-                    Some(v)=>Ok(v),
+        match self {
+            Value::Object(v) => {
+                match v {
+                    Some(v2)=>Ok(v2),
                     None => Err(format!("Trying to get an Object out of an uninitialized 'Object' variable"))
                 }
             },
@@ -133,42 +143,42 @@ impl <'a>Value<'a> {
     /// return an option just to make it quicker, and 
     /// it is thought to be used internally.
     pub fn to_f64(&self) -> Result<f64,String> {
-        match self.value_type { 
+        match self { 
             // Numbers are easy
-            ValueType::Number => self.unrwap_number(),                        
+            Value::Number(_) => self.unrwap_number(),                        
             _ => Err(format!("Cannot transform type '{}' into 'f64'", self.typename()))        
         }
     }
     
 
     pub fn to_bool(&self)->Result<bool,String>{
-        match self.value_type {            
-            ValueType::Bool =>self.unrwap_boolean(),
+        match self {            
+            Value::Bool(_) =>self.unrwap_boolean(),
             _ => Err(format!("Cannot transform type '{}' into 'bool'", self.typename()))        
         }
     }
 
     pub fn to_string(&self)->String{
-        match self.value_type {
-            ValueType::Bool =>{
-                match self.unrwap_boolean(){
-                    Ok(v)=>format!("{}",v),
-                    Err(_) => format!("'empty boolean'"),
+        match self {
+            Value::Bool(v) =>{
+                match v {
+                    Some(v2)=>format!("{}",v2),
+                    None => format!("'empty boolean'"),
                 }
             },
-            ValueType::Number =>{
-                match self.unrwap_number(){
-                    Ok(v)=>format!("{}",v),
-                    Err(_) => format!("'empty number'"),
+            Value::Number(v) =>{
+                match v {
+                    Some(v2)=>format!("{}",v2),
+                    None => format!("'empty number'"),
                 }
             },
-            ValueType::Object =>{
-                match self.unrwap_object(){
-                    Ok(v)=>format!("Object[{}]",v.class()),
-                    Err(_) => format!("'empty number'"),
+            Value::Object(v) =>{
+                match v {
+                    Some(v2)=>format!("Object[{}]",v2.class()),
+                    None => format!("'empty number'"),
                 }
             },
-            ValueType::Nil => format!("Nil")                
+            Value::Nil => format!("Nil")                
             
         }
     }
