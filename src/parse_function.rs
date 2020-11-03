@@ -29,30 +29,15 @@ pub fn unary(parser: &mut Parser){
 
 
 pub fn number(parser: &mut Parser){
-    let v = parser.previous().source_text(parser.source());        
-    if v.contains("."){
-        let the_v = match v.parse::<f64>(){
-            Ok(v)=>v,
-            Err(msg)=>{
-                return parser.error_at_current(msg.to_string());
-            }
-        };
-        //let index = parser.add_constant(PPLValue::PPLFloat(the_v));                        
-        //parser.emit_byte(Operation::Constant(index));
-        parser.emit_byte(Operation::PushFloat(the_v));
-        
-    }else{
-        let the_v = match v.parse::<i32>(){
-            Ok(v)=>v,
-            Err(msg)=>{
-                return parser.error_at_current(msg.to_string());
-            }
-        };
-        //let index = parser.add_constant(PPLValue::PPLInt(the_v));                        
-        //parser.emit_byte(Operation::Constant(index));
-        parser.emit_byte(Operation::PushInt(the_v));
-
-    }
+    let v = parser.previous().source_text(parser.source());            
+    let the_v = match v.parse::<f64>(){
+        Ok(v)=>v,
+        Err(msg)=>{
+            return parser.error_at_current(msg.to_string());
+        }
+    };    
+    parser.emit_byte(Operation::PushNumber(the_v));
+    
 }
 
 pub fn grouping(parser: &mut Parser){

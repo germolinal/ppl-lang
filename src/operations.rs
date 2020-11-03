@@ -1,11 +1,9 @@
-use crate::chunk::*;
 
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
 pub enum Operation {
     Return,
-    Constant(usize),
     Negate,
     Not,
     Add,
@@ -13,12 +11,12 @@ pub enum Operation {
     Multiply,
     Divide,
     PushNil,
-    PushBool(bool),
-    PushFloat(f64),
-    PushInt(i32),
     Equal,
     Greater,
     Less,
+    Constant(usize),
+    PushBool(bool),
+    PushNumber(f64),    
 }
 /*
 impl Clone for Operation {

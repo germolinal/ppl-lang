@@ -4,8 +4,7 @@ pub mod debug {
     use crate::token::*;
     
     fn simple_instruction(name: &str, _offset: usize) {
-        println!("{}",name);
-        //return offset + 1;
+        println!("{}",name);        
     }
     
     fn constant_instruction(name: &str, chunk: &Chunk, c_index: usize) {    
@@ -15,13 +14,10 @@ pub mod debug {
         println!("{}\tconst {} | '{}'", name,c_index, c.to_string());              
     }
 
-    fn push_float_instruction(c : f64) {            
-        println!("OP_PUSH_FLOAT | '{}'", c);         
+    fn push_number_instruction(c : f64) {            
+        println!("OP_PUSH_NUMBER | '{}'", c);         
     }
 
-    fn push_int_instruction(c : i32) {            
-        println!("OP_PUSH_INT | '{}'", c);         
-    }
     
     /// Disassembles an Operation
     /// # Arguments:
@@ -86,12 +82,8 @@ pub mod debug {
                 }
             },
 
-            Operation::PushFloat(v)=>{
-                return push_float_instruction(*v)
-            },
-
-            Operation::PushInt(v)=>{
-                return push_int_instruction(*v);
+            Operation::PushNumber(v)=>{
+                return push_number_instruction(*v)
             },
 
             Operation::Equal => {
@@ -187,7 +179,7 @@ pub mod debug {
             let v = 1.2;
             let mut c = Chunk::new();
     
-            let constant_i = c.add_constant(PPLValue::PPLFloat(v));                        
+            let constant_i = c.add_constant(Value::new_number(v));                        
             c.write_operation(Operation::Constant(constant_i), 123);                
             c.write_operation(Operation::Return, 0);
             

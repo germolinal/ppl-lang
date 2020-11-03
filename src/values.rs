@@ -1,88 +1,175 @@
 
 #[derive(Copy, Clone)]
-pub enum PPLValue<'a> {
-    PPLNil,
-    PPLFloat(f64),
-    PPLInt(i32),
-    PPLString(&'a String),    
-    PPLBool(bool),    
+#[repr(u8)] 
+#[derive(PartialEq,PartialOrd)]
+pub enum ValueType {      
+    Number,          
+    Bool,    
+    Object,
+    Nil,
 }
 
+pub struct Object{
+    content: bool
+}
 
-impl <'a>PPLValue<'a> {
+impl Object {
+    pub fn class(&self)->String{
+        "some class".to_string()
+    }
+}
+
+#[derive(Copy,Clone)]
+pub struct Value<'a>{
+    value_type: ValueType,
+    number: Option<f64>,
+    boolean : Option<bool>,
+    object: Option<&'a Object>
+}
+
+impl <'a>Value<'a> {
+
+    /// Constructs a Nil 
+    pub fn new_nil()->Self{
+        Self{
+            value_type: ValueType::Nil,
+            number: None,
+            boolean: None,
+            object: None,
+        }
+    }
+
+    /// Constructs a number
+    pub fn new_number(v: f64)->Self{
+        Self{
+            value_type: ValueType::Number,
+            number: Some(v),
+            boolean: None,
+            object: None,
+        }
+    }
+
+
+    /// Constructs a boolean
+    pub fn new_bool(v: bool)->Self{
+        Self{
+            value_type: ValueType::Bool,
+            number: None,
+            boolean: Some(v),
+            object: None,
+        }
+    }
+
+    /// Constructs an Object
+    pub fn new_object(v: &'a Object)->Self{
+        Self{
+            value_type: ValueType::Object,
+            number: None,
+            boolean: None,
+            object: Some(v),
+        }
+    }
 
     /// Gets the type of the value as a String 
     /// This is for giving feedback to the user... not 
     /// for internal use.
-    pub fn ppl_type(&self)-> &str {
-        match self{
-            PPLValue::PPLNil => "Nil",
-            PPLValue::PPLFloat(_) => "Float",
-            PPLValue::PPLInt(_) => "Integer",
-            PPLValue::PPLString(_) => "String",
-            PPLValue::PPLBool(_) => "Boolean",
+    pub fn typename(&self)-> &str {
+        match self.value_type{            
+            ValueType::Number => "Number",            
+            ValueType::Bool => "Boolean",
+            ValueType::Object => "Object",                
+            ValueType::Nil => "Nil"
+        }
+    }
+
+    /// Retrieves the ValueType
+    pub fn value_type(&self)->ValueType{
+        self.value_type
+    }
+
+    /// Retrieves the number contained within the 
+    /// value, returns a Result.
+    pub fn unrwap_number(&self)->Result<f64, String>{
+        match self.value_type {
+            ValueType::Number => {
+                match self.number {
+                    Some(v)=>Ok(v),
+                    None => Err(format!("Trying to get a number out of an uninitialized 'Number' variable"))
+                }
+            },
+            _ => Err(format!("Trying to get number out of '{}'",self.typename()))
+        }
+    }
+
+    /// Retrieves the boolean contained within the 
+    /// value, returns a Result.
+    pub fn unrwap_boolean(&self)->Result<bool, String>{
+        match self.value_type {
+            ValueType::Bool => {
+                match self.boolean {
+                    Some(v)=>Ok(v),
+                    None => Err(format!("Trying to get a boolean out of an uninitialized 'Boolean' variable"))
+                }
+            },
+            _ => Err(format!("Trying to get a boolean out of '{}'",self.typename()))        
+        }
+    }
+
+    /// Retrieves the boolean contained within the 
+    /// value, returns a Result.
+    pub fn unrwap_object(&self)->Result<&Object, String>{
+        match self.value_type {
+            ValueType::Object => {
+                match self.object {
+                    Some(v)=>Ok(v),
+                    None => Err(format!("Trying to get an Object out of an uninitialized 'Object' variable"))
+                }
+            },
+            _ => Err(format!("Trying to get an Object out of '{}'",self.typename()))
         }
     }
 
     /// Retrieves the Value as an f64. This does not 
     /// return an option just to make it quicker, and 
     /// it is thought to be used internally.
-    pub fn to_f64(&self) -> f64 {
-        match self {
+    pub fn to_f64(&self) -> Result<f64,String> {
+        match self.value_type { 
             // Numbers are easy
-            PPLValue::PPLFloat(v)=>*v,
-            PPLValue::PPLInt(v)=>*v as f64,
+            ValueType::Number => self.unrwap_number(),                        
+            _ => Err(format!("Cannot transform type '{}' into 'f64'", self.typename()))        
+        }
+    }
+    
 
-            // We will try with string
-            PPLValue::PPLString(v)=>{
-                let s = v.parse::<f64>();
-                match s {
-                    Ok(v) => v,
-                    Err(_) => panic!("Cannot transform string '{}' into 'f64'", v)
-                }                
-            }
-            _ => panic!("Cannot transform type '{}' into 'f64'", self.ppl_type())
+    pub fn to_bool(&self)->Result<bool,String>{
+        match self.value_type {            
+            ValueType::Bool =>self.unrwap_boolean(),
+            _ => Err(format!("Cannot transform type '{}' into 'bool'", self.typename()))        
         }
     }
 
-    /// Retrieves the Value as an i32. This does not 
-    /// return an option just to make it quicker, and 
-    /// it is thought to be used internally.
-    pub fn to_i32(&self)->i32{
-        match self {
-            // Numbers are easy
-            PPLValue::PPLFloat(v)=>*v as i32,
-            PPLValue::PPLInt(v)=>*v as i32,
-            // Let's try with string
-            PPLValue::PPLString(v)=>{
-                let s = v.parse::<i32>();
-                match s {
-                    Ok(v) => v,
-                    Err(_) => panic!("Cannot transform string '{}' into 'i32'", v)
-                }                
-            }
-            _ => panic!("Cannot transform type '{}' into 'i32'", self.ppl_type())
-        }
-    }
-
-    /// Retrieves the Value as a String. This does not 
-    /// return an option just to make it quicker, and 
-    /// it is thought to be used internally.
     pub fn to_string(&self)->String{
-        match self {            
-            PPLValue::PPLFloat(v) => v.to_string(),
-            PPLValue::PPLInt(v) => v.to_string(),            
-            PPLValue::PPLString(v)=>(**v).clone(),
-            PPLValue::PPLNil => "".to_string(),
-            PPLValue::PPLBool(v)=>{ if *v { "true".to_string() }else{"false".to_string()} }
+        match self.value_type {
+            ValueType::Bool =>{
+                match self.unrwap_boolean(){
+                    Ok(v)=>format!("{}",v),
+                    Err(_) => format!("'empty boolean'"),
+                }
+            },
+            ValueType::Number =>{
+                match self.unrwap_number(){
+                    Ok(v)=>format!("{}",v),
+                    Err(_) => format!("'empty number'"),
+                }
+            },
+            ValueType::Object =>{
+                match self.unrwap_object(){
+                    Ok(v)=>format!("Object[{}]",v.class()),
+                    Err(_) => format!("'empty number'"),
+                }
+            },
+            ValueType::Nil => format!("Nil")                
             
-        }
-    }
-
-    pub fn to_bool(&self)->bool{
-        match self {
-            PPLValue::PPLBool(v)=>{ *v},
-            _ => panic!("Cannot transform type '{}' into 'bool'", self.ppl_type())
         }
     }
 
@@ -103,203 +190,19 @@ mod tests {
     /*********/
     // TO f64
     /*********/
-    #[test]
-    #[should_panic]
+    #[test]    
     fn test_nil_to_f64() {        
-        PPLValue::PPLNil.to_f64();
+        assert!(Value::new_nil().to_f64().is_err());
     }
     
     #[test]
     fn test_float_to_f64() {        
         let exp = 1.12312;
-        let v = PPLValue::PPLFloat(exp);
-        let found = v.to_f64();
+        let v = Value::new_number(exp);
+        let found = v.to_f64().unwrap();
         assert_eq!(exp,found);
     }
     
-    #[test]
-    fn test_int_to_f64() {        
-        let exp = 121;
-        let v = PPLValue::PPLInt(exp);
-        let found = v.to_f64();
-        assert_eq!(exp as f64,found);
-    }
     
-    #[test]
-    fn test_string_to_f64_ok() {        
-        
-        let exp = "1".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_f64();
-        assert_eq!(1.0,found);
-
-        let exp = "1.12312".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_f64();
-        assert_eq!(1.12312,found);
-
-        let exp = "-1.12312".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_f64();
-        assert_eq!(-1.12312,found);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_string_to_f64_not_ok() {        
-        
-        let exp = "A1".to_string();
-        PPLValue::PPLString(&exp).to_f64();
-        
-
-        let exp = "V1.12312".to_string();
-        PPLValue::PPLString(&exp).to_f64();
-        
-        let exp = "1-1.12312".to_string();
-        PPLValue::PPLString(&exp).to_f64();        
-    }
-    
-
-    /*********/
-    // TO i32
-    /*********/
-    #[test]
-    #[should_panic]
-    fn test_nil_to_i32() {        
-        PPLValue::PPLNil.to_i32();
-    }
-    
-    #[test]
-    fn test_float_to_i32() {        
-
-        // This gets floored (i.e. it ends up being 1123)
-        let exp = 1123.812312;
-        let v = PPLValue::PPLFloat(exp);
-        let found = v.to_i32();
-        assert_eq!(exp as i32,found);        
-
-        // This becomes -1123
-        let exp = -1123.812312;
-        let v = PPLValue::PPLFloat(exp);
-        let found = v.to_i32();
-        assert_eq!(exp as i32,found);        
-    }
-    
-    #[test]
-    fn test_int_to_i32() {        
-        let exp = 121;
-        let v = PPLValue::PPLInt(exp);
-        let found = v.to_i32();
-        assert_eq!(exp,found);
-
-
-        let exp = -0621;
-        let v = PPLValue::PPLInt(exp);
-        let found = v.to_i32();
-        assert_eq!(exp,found);
-    }
-    
-    #[test]
-    fn test_string_to_i32_ok() {        
-        
-        let exp = "1".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_i32();
-        assert_eq!(1,found);
-
-        let exp = "11".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_i32();
-        assert_eq!(11,found);
-
-        let exp = "-31".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_i32();
-        assert_eq!(-31,found);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_string_to_i32_not_ok() {        
-        
-        let exp = "A1".to_string();
-        PPLValue::PPLString(&exp).to_i32();
-        
-
-        let exp = "V1.12312".to_string();
-        PPLValue::PPLString(&exp).to_i32();
-        
-        let exp = "1-1.12312".to_string();
-        PPLValue::PPLString(&exp).to_i32();        
-
-        let exp = "1.12312".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_i32();
-        assert_eq!(1,found);
-
-        let exp = "-1.12312".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_i32();
-        assert_eq!(-1,found);
-    }
-
-    /*********/
-    // TO String
-    /*********/
-    #[test]    
-    fn test_nil_to_string() {        
-        let v = PPLValue::PPLNil.to_string();
-        assert_eq!(v,"");
-    }
-    
-    #[test]
-    fn test_float_to_string() {        
-
-        // This gets floored (i.e. it ends up being 1123)
-        let exp = 1123.812312;
-        let v = PPLValue::PPLFloat(exp);
-        let found = v.to_string();
-        assert_eq!(exp.to_string(),found);        
-
-        // This becomes -1123
-        let exp = -1123.812312;
-        let v = PPLValue::PPLFloat(exp);
-        let found = v.to_string();
-        assert_eq!(exp.to_string(),found);        
-    }
-    
-    #[test]
-    fn test_int_to_string() {        
-        let exp = 121;
-        let v = PPLValue::PPLInt(exp);
-        let found = v.to_string();
-        assert_eq!(exp.to_string(),found);
-
-
-        let exp = -0621;
-        let v = PPLValue::PPLInt(exp);
-        let found = v.to_string();
-        assert_eq!(exp.to_string(),found);
-    }
-    
-    #[test]
-    fn test_string_to_string() {        
-        
-        let exp = "1".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_string();
-        assert_eq!("1".to_string(),found);
-
-        let exp = "11".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_string();
-        assert_eq!("11".to_string(),found);
-
-        let exp = "-31".to_string();
-        let v = PPLValue::PPLString(&exp);
-        let found = v.to_string();
-        assert_eq!("-31".to_string(),found);
-    }
-
     
 }

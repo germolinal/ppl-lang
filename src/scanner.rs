@@ -207,7 +207,7 @@ impl <'a>Scanner<'a> {
         while self.peek().is_ascii_digit(){            
             self.advance();            
         }
-        if self.peek()=='.' && self.peek_next().is_ascii_digit(){            
+        if self.peek() == '.' && self.peek_next().is_ascii_digit(){            
             // Consume the .            
             self.advance();
             while self.peek().is_ascii_digit() {                

@@ -111,7 +111,7 @@ impl <'a>Parser<'a>{
         self.emit_byte(Operation::Return);
     }
 
-    pub fn add_constant(&mut self,v: PPLValue<'a>)->usize{
+    pub fn add_constant(&mut self,v: Value<'a>)->usize{
         self.chunk.add_constant(v)
     }
 
@@ -378,8 +378,8 @@ mod tests {
         }
         
         number(&mut parser);        
-        if let Operation::PushInt(found) = parser.chunk.code().last().unwrap() {            
-            assert_eq!(2,*found);            
+        if let Operation::PushNumber(found) = parser.chunk.code().last().unwrap() {            
+            assert_eq!(2.0,*found);            
         }else{
             assert!(false);
         }
@@ -399,7 +399,7 @@ mod tests {
         
         number(&mut parser);
         number(&mut parser);        
-        if let Operation::PushFloat(found) = parser.chunk.code().last().unwrap() {            
+        if let Operation::PushNumber(found) = parser.chunk.code().last().unwrap() {            
             assert_eq!(2.1,*found);            
         }else{
             assert!(false);
