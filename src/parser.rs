@@ -5,6 +5,7 @@ use crate::token::*;
 use crate::chunk::*;
 use crate::values::*;
 use crate::parse_function::*;
+use crate::variable::*;
 
 #[repr(u8)] 
 #[derive(PartialEq,PartialOrd)]
@@ -32,6 +33,7 @@ pub struct ParseRule{
     pub next_precedence: Option<Precedence>
 }
 
+
 pub struct Parser<'a>{
     current: Token,
     previous: Token,
@@ -39,6 +41,9 @@ pub struct Parser<'a>{
     panic_mode: bool,
     scanner: Scanner<'a>,
     chunk: Chunk<'a>,
+    
+    variables: Vec<NamedVar<'a>>,
+    variable_count: Vec<usize>,
 }
 
 impl <'a>Parser<'a>{
@@ -54,24 +59,30 @@ impl <'a>Parser<'a>{
             current: current,
             previous: previous,
             chunk: Chunk::new(),
+
+            variables: vec![],
+            variable_count: vec![0],
         }
     }
 
     /* UTILITY FUNCTIONS */
 
-    pub fn compile(&mut self) -> bool {        
-        self.advance();
+    fn scope_depth(&self)->usize{
+        self.variable_count.len()
+    }    
 
-        self.expression();
-
-        
-        if !self.consume(TokenType::EOF){            
-            self.error_at_current(format!("Expected end of expression"));
+    fn current_scope_has_variable(&self, var_name: &String)->bool{
+        let n = self.variable_count[self.scope_depth()-1];
+        let fin = self.variables.len();
+        let ini = fin - n;
+        for i in ini..fin{
+            if var_name == &self.variables[i].name {
+                return true
+            }
         }
-
-        return !self.had_error;
+        false
     }
-
+    
     pub fn previous(&self)->Token{
         self.previous
     }
@@ -99,21 +110,38 @@ impl <'a>Parser<'a>{
         false
     }
 
-    pub fn emit_byte(&mut self, op: Operation){
-        self.chunk.write_operation(op, self.previous.line());
+    fn check(&self, t: TokenType)->bool{
+        self.current.token_type() == t
     }
 
+    
+    fn match_token(&mut self, t: TokenType) -> bool{
+        if !self.check(t) {
+            return false;
+        }
+        self.advance();
+        true
+    }
+    
+
+    pub fn emit_byte(&mut self, op: Operation<'a>){
+        self.chunk.write_operation(op, self.previous.line());
+    }
+    /*
     fn end_compiler(&mut self){
         self.emit_return();
     }
-
+    
     fn emit_return(&mut self){
         self.emit_byte(Operation::Return);
     }
+    */
 
+    /*
     pub fn add_constant(&mut self,v: Value<'a>)->usize{
         self.chunk.add_constant(v)
     }
+    */
 
     pub fn source(&self)->&Vec<u8>{
         self.scanner.source()
@@ -124,9 +152,9 @@ impl <'a>Parser<'a>{
         match ttype{
             TokenType::RightParen | 
             TokenType::LeftBrace | TokenType::RightBrace |
-            TokenType::Comma | 
+            TokenType::Comma | TokenType::Semicolon |
             TokenType::Equal |
-            //TokenType::Class | 
+            TokenType::Class | 
             TokenType::Else |
             TokenType::For | 
             TokenType::Function | 
@@ -199,6 +227,7 @@ impl <'a>Parser<'a>{
                     infix: Some(binary),
                 }
             },
+            /*
             TokenType::True |TokenType::False | TokenType::Nil => {
                 ParseRule{
                     precedence: Precedence::None,
@@ -207,6 +236,7 @@ impl <'a>Parser<'a>{
                     infix: None,
                 }
             },
+            */
             TokenType::BangEqual | TokenType::EqualEqual =>{
                 ParseRule{
                     precedence: Precedence::Equality,
@@ -222,22 +252,15 @@ impl <'a>Parser<'a>{
                     prefix: None,
                     infix: Some(binary),
                 }
-            } 
+            },            
             _ => {
-                println!(" ===> {}",debug::token_type(ttype));
+                eprintln!(" ===> {}",debug::token_type(ttype));
                 unimplemented!()
             }
         }
     }
 
-    
-    pub fn expression(&mut self){
-        self.parse_precedence(Precedence::Assignment);
-    }
-
-    
-
-    pub fn parse_precedence(&mut self, precedence: Precedence){
+    pub fn parse_precedence(&mut self, precedence: Precedence){          
         self.advance();
         let rule = match self.get_rule(self.previous.token_type()).prefix {
             Some(r)=>{
@@ -257,6 +280,203 @@ impl <'a>Parser<'a>{
             }
         }                
     }
+
+    
+    /// Compiles a program, returns a boolean
+    /// indicating if it worked.
+    ///     
+    /// # EBNF Grammar
+    /// program -> declaration* EOF
+    pub fn program(&mut self) -> bool {            
+        // Prime the pump
+        self.advance();
+        self.advance();
+
+        while !self.match_token(TokenType::EOF){
+            self.declaration();
+        }
+                
+
+        return !self.had_error;
+    }
+
+    /// Compiles a declaration    
+    ///     
+    /// # EBNF Grammar
+    /// declaration -> classDecl | funDecl | varDecl | statement
+    fn declaration(&mut self){        
+        match self.previous.token_type(){
+            TokenType::Class => {
+                self.advance();
+                unimplemented!();
+            },
+            TokenType::Function => {
+                self.advance();
+                unimplemented!();
+            },
+            TokenType::Let => {
+                self.advance();
+                self.var_declaration();
+            },
+            _ => {                
+                self.statement();
+            }
+        }
+    }
+
+    /// Compiles a Variable declaration    
+    ///     
+    /// # EBNF Grammar
+    /// var_declaration -> "let" IDENTIFIER (":" TYPE ) ("=" expression)
+    fn var_declaration(&mut self){        
+        // Name is previous.
+        let var_name = if let TokenType::Identifier = self.previous.token_type(){            
+            self.previous.source_text(self.source())
+        }else{
+            return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",self.previous.source_text(self.source()) ))
+        };
+
+        // Check if variable is the current scope            
+        if self.current_scope_has_variable(&var_name){
+            return self.error_at_current(format!("Redeclaration of variable '{}'",var_name));
+        }
+    
+        // All good to go. Create default values
+        let var_type = ValueType::Nil;
+        let val = Value::Nil;
+
+        // Check if it has a type                        
+        if let TokenType::Colon = self.current.token_type(){
+            // let x : String            
+            unimplemented!();
+            // Expect type, consume
+        }
+                
+        // Register variable in the parser
+        self.variables.push(NamedVar{
+            name: var_name,
+            value: val,
+            value_type: var_type,
+        });
+        let depth = self.variable_count.len();
+        self.variable_count[depth-1] += 1;
+
+        // Emit operation for the VM.
+        self.emit_byte(Operation::PushVar(Var{
+            value: val,
+            value_type: var_type
+        }));
+
+
+        // Define it if needed
+        if self.match_token(TokenType::Equal){            
+            // Put value of expression on the stack                        
+            self.expression();            
+
+            self.emit_byte(Operation::DefineVar(self.variables.len()-1))            
+        }
+
+
+
+
+        // Leave the semicolon behind                    
+        if !self.consume(TokenType::Semicolon){
+            return self.error_at_current(format!("Expecting ';' after variable declaration."));
+        }        
+
+        // Make the semicolon disappear...
+        self.advance(); 
+    }
+
+    /// Compiles a statement
+    /// 
+    /// # EBNF Grammar:
+    /// statement -> expression | forStmt | ifStmt | returnStmt | whileStmt| block ;
+    fn statement(&mut self){  
+        
+        println!("previous {} | current {}",debug::token(self.previous, self.scanner.source()),debug::token(self.current, self.scanner.source()));        
+
+        match self.previous().token_type(){
+            TokenType::LeftBrace => {
+                self.advance();
+                self.begin_scope();
+                self.block();
+                self.end_scope();
+            },
+            TokenType::For =>{
+                self.advance();
+                unimplemented!();
+            },
+            TokenType::If =>{
+                self.advance();
+                unimplemented!();
+            },
+            TokenType::Return =>{
+                self.advance();
+                unimplemented!();
+            },
+            TokenType::While =>{
+                self.advance();
+                unimplemented!();
+            },
+            TokenType::EOF=>{
+                return
+            },
+            _ => self.expression()
+        }
+    }
+
+
+    /// Compiles an expression
+    /// # EBFN Grammar:
+    /// expression -> literal | unary | binary | grouping;
+    pub fn expression(&mut self){            
+        self.parse_precedence(Precedence::Assignment);
+    }
+
+
+    /// Opens a scope, after a Left Brace
+    fn begin_scope(&mut self){          
+        // add an empty variable counter                
+        self.variable_count.push(0)        
+    }
+
+    /// Closes a scope and emits all the necessary
+    /// PopVar operations, removing the local variables
+    fn end_scope(&mut self){           
+        if let Some(n) = self.variable_count.pop(){
+            // Pop variables from parser stack
+            for _ in 0..n{
+                if let Some(_) = self.variables.pop(){
+
+                }else{
+                    panic!("Trying to pop variables from empty scope");
+                }
+            }
+
+            // Emit operation to clean the VM.
+            self.emit_byte(Operation::PopVars(n));
+
+        }else{
+            self.internal_error_at_current(format!("Trying to end a scope but there are no scopes"))
+        }        
+    }
+
+    
+    /// Parses a block
+    /// 
+    /// # EBNF Grammar:
+    /// block -> "{" declaration* "}"
+    fn block(&mut self){
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::EOF){
+            self.declaration();
+        }
+        if !self.consume(TokenType::RightBrace){
+            self.error_at_current(format!("Expecting '}}' after block."));
+        }
+    }
+
+    
 
     /* ERROR FUNCTIONS */
 
@@ -413,7 +633,114 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.compile();
+        parser.program();
+        debug::chunk(&parser.chunk, format!("some chunck"));
+    }
+
+    #[test]
+    fn test_var_declaration(){
+        let raw_source = "let x = 2; let y; let z = 5;".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);
+        parser.program();
+
+        assert_eq!(3,parser.variables.len());
+        assert_eq!(parser.variables[0].name,"x".to_string());
+        assert_eq!(parser.variables[1].name,"y".to_string());
+        assert_eq!(parser.variables[2].name,"z".to_string());
+        
+    }
+
+    #[test]
+    fn test_current_scope_has_variable(){
+        let raw_source = "{let x; let y; let z;}".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);
+        parser.program();
+        assert!(parser.current_scope_has_variable(&format!("x")));
+    }
+
+    #[test]
+    fn test_scopes(){
+        let raw_source = "let x; {let y;} let z;".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);
+        
+        // Prime the pump... this is done by program()
+        parser.advance();parser.advance();
+        
+        // Check empty variables   
+        assert_eq!(parser.scope_depth(),1);     
+        assert_eq!(parser.variables.len(),0);
+        assert_eq!(parser.variable_count.len(),1);
+        assert_eq!(parser.variable_count[0],0);
+        
+
+        // Consume the first variable           
+        parser.declaration();        
+        
+        // There is only the "main" scope
+        assert_eq!(parser.scope_depth(),1);     
+        assert_eq!(parser.variables.len(),1);
+        assert_eq!(parser.variables[0].name,"x".to_string());
+        assert_eq!(parser.variable_count.len(),1);
+        assert_eq!(parser.variable_count[0],1);
+        if let Operation::PushVar(Var{
+            value_type: ValueType::Nil,
+            value: Value::Nil
+        }) = parser.chunk.code()[0]{
+            assert!(true);
+        }else{assert!(false)};
+
+
+        // Consume the block, with the variable                
+        assert!(parser.consume(TokenType::LeftBrace));
+        parser.advance(); 
+        parser.begin_scope();
+        parser.block();                
+        
+        // There is the "main" scope, and the new one
+        assert_eq!(parser.scope_depth(),2);     
+        assert_eq!(parser.variables.len(),2);
+        assert_eq!(parser.variables[1].name,"y".to_string());
+        assert_eq!(parser.variable_count.len(),2);
+        assert_eq!(parser.variable_count[0],1);
+        assert_eq!(parser.variable_count[1],1);
+        if let Operation::PushVar(Var{
+            value_type: ValueType::Nil,
+            value: Value::Nil
+        }) = parser.chunk.code()[1]{
+            assert!(true);
+        }else{assert!(false)};
+
+        parser.end_scope();
+        assert_eq!(parser.scope_depth(),1);     
+        assert_eq!(parser.variables.len(),1);        
+        assert_eq!(parser.variable_count.len(),1);
+        assert_eq!(parser.variable_count[0],1);
+        // y should not be there any more.
+        assert!(!parser.current_scope_has_variable(&"y".to_string()));        
+        parser.advance();
+
+        // Consume what is after the block, with the variable                
+        parser.declaration();                
+        
+        // There is the "main" scope, and the new one
+        assert_eq!(parser.scope_depth(),1);     
+        assert_eq!(parser.variable_count.len(),1);
+        assert_eq!(parser.variables.len(),2);
+        assert_eq!(parser.variables[1].name,"z".to_string());
+        assert_eq!(parser.variable_count[0],2);
+        if let Operation::PushVar(Var{
+            value_type: ValueType::Nil,
+            value: Value::Nil
+        }) = parser.chunk.code()[1]{
+            assert!(true);
+        }else{assert!(false)};
+        
         debug::chunk(&parser.chunk, format!("some chunck"));
     }
 }

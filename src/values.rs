@@ -10,7 +10,7 @@ pub enum ValueType {
 }
 
 pub struct Object{
-    content: bool
+    _content: bool
 }
 
 impl Object {
@@ -30,50 +30,30 @@ pub struct Value<'a>{
 */
 #[derive(Copy,Clone)]
 pub enum Value<'a>{
-    Number(Option<f64>),          
-    Bool(Option<bool>),    
-    Object(Option<&'a Object>),
+    Number(f64),          
+    Bool(bool),    
+    Object(&'a Object),
     Nil,
 }
 
 impl <'a>Value<'a> {
-
-    /// Constructs a Nil 
-    pub fn new_nil()->Self{
-        Value::Nil
-    }
-
+    
     /// Constructs a number
     pub fn new_number(v: f64)->Self{
-        Value::Number(Some(v))
+        Value::Number(v)
     }
-
 
     /// Constructs a boolean
     pub fn new_bool(v: bool)->Self{
-        Value::Bool(Some(v))
+        Value::Bool(v)
     }
 
     /// Constructs an Object
     pub fn new_object(v: &'a Object)->Self{
-        Value::Object(Some(v))
+        Value::Object(v)
     }
 
-    /// Constructs a number
-    pub fn new_empty_number()->Self{
-        Value::Number(None)
-    }
-
-
-    /// Constructs a boolean
-    pub fn new_empty_bool()->Self{
-        Value::Bool(None)
-    }
-
-    /// Constructs an Object
-    pub fn new_empty_object()->Self{
-        Value::Object(None)
-    }
+    
 
     /// Gets the type of the value as a String 
     /// This is for giving feedback to the user... not 
@@ -102,10 +82,7 @@ impl <'a>Value<'a> {
     pub fn unrwap_number(&self)->Result<f64, String>{
         match self {
             Value::Number(v) => {
-                match v {
-                    Some(v2)=>Ok(*v2),
-                    None => Err(format!("Trying to get a number out of an uninitialized 'Number' variable"))
-                }
+                Ok(*v)                
             },
             _ => Err(format!("Trying to get number out of '{}'",self.typename()))
         }
@@ -116,10 +93,7 @@ impl <'a>Value<'a> {
     pub fn unrwap_boolean(&self)->Result<bool, String>{
         match self {
             Value::Bool(v) => {
-                match v {
-                    Some(v2)=>Ok(*v2),
-                    None => Err(format!("Trying to get a boolean out of an uninitialized 'Boolean' variable"))
-                }
+                Ok(*v)                
             },
             _ => Err(format!("Trying to get a boolean out of '{}'",self.typename()))        
         }
@@ -130,10 +104,7 @@ impl <'a>Value<'a> {
     pub fn unrwap_object(&self)->Result<&Object, String>{
         match self {
             Value::Object(v) => {
-                match v {
-                    Some(v2)=>Ok(v2),
-                    None => Err(format!("Trying to get an Object out of an uninitialized 'Object' variable"))
-                }
+                Ok(*v)                
             },
             _ => Err(format!("Trying to get an Object out of '{}'",self.typename()))
         }
@@ -161,22 +132,13 @@ impl <'a>Value<'a> {
     pub fn to_string(&self)->String{
         match self {
             Value::Bool(v) =>{
-                match v {
-                    Some(v2)=>format!("{}",v2),
-                    None => format!("'empty boolean'"),
-                }
+                format!("{}",v)
             },
             Value::Number(v) =>{
-                match v {
-                    Some(v2)=>format!("{}",v2),
-                    None => format!("'empty number'"),
-                }
+                format!("{}",v)
             },
-            Value::Object(v) =>{
-                match v {
-                    Some(v2)=>format!("Object[{}]",v2.class()),
-                    None => format!("'empty number'"),
-                }
+            Value::Object(v) =>{                
+                format!("Object[{}]",v.class())
             },
             Value::Nil => format!("Nil")                
             
@@ -200,11 +162,8 @@ mod tests {
     /*********/
     // TO f64
     /*********/
-    #[test]    
-    fn test_nil_to_f64() {        
-        assert!(Value::new_nil().to_f64().is_err());
-    }
     
+
     #[test]
     fn test_float_to_f64() {        
         let exp = 1.12312;

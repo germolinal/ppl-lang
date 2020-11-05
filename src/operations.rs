@@ -1,36 +1,25 @@
-
+use crate::variable::*;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
-pub enum Operation {
+pub enum Operation<'a> {
     Return,
     Negate,
     Not,
     Add,
     Subtract,
     Multiply,
-    Divide,
-    PushNil,
+    Divide,    
     Equal,
     Greater,
     Less,
-    Constant(usize),
+    //Constant(usize),
     PushBool(bool),
-    PushNumber(f64),    
+    PushNumber(f64),  
+    PushVar(Var<'a>),
+    PopVars(usize),
+    DefineVar(usize),
 }
-/*
-impl Clone for Operation {
-    fn clone(&self) -> Self {
-        match self {
-            Operation::Return => Operation::Return,
-            Operation::Constant(e) => Operation::Constant(*e),
-            Operation::Negate => Operation::Negate,
-            Operation::Not => Operation::Not,
-            
-        }
-    }
-}
-*/
 
 
 
@@ -39,8 +28,7 @@ impl Clone for Operation {
 /***********/
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests {    
 
     #[test]
     fn test_disassemble() {

@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 pub mod debug {
     use crate::chunk::*;
     use crate::operations::*;
@@ -7,16 +8,18 @@ pub mod debug {
         println!("{}",name);        
     }
     
+    /*
     fn constant_instruction(name: &str, chunk: &Chunk, c_index: usize) {    
         let cons = chunk.constants();
         let c = &cons[c_index];
     
         println!("{}\tconst {} | '{}'", name,c_index, c.to_string());              
     }
+    */
 
-    fn push_number_instruction(c : f64) {            
-        println!("OP_PUSH_NUMBER | '{}'", c);         
-    }
+    
+
+    
 
     
     /// Disassembles an Operation
@@ -41,9 +44,11 @@ pub mod debug {
                 return simple_instruction(&"OP_RETURN", offset)
             },
     
+            /*
             Operation::Constant(c_index) => {
                 return constant_instruction(&"OP_CONSTANT", chunk, *c_index);
             },
+            */
     
             Operation::Negate => {
                 return simple_instruction("OP_NEGATE", offset);
@@ -68,12 +73,11 @@ pub mod debug {
             Operation::Divide => {
                 return simple_instruction("OP_DIVIDE", offset);
             }
-            ,
-
+            /*,
             Operation::PushNil => {
                 return simple_instruction("OP_PUSH_NIL", offset );
             },
-
+            */
             Operation::PushBool(b) => {
                 if *b {
                     return simple_instruction("OP_PUSH_TRUE", offset );
@@ -83,7 +87,17 @@ pub mod debug {
             },
 
             Operation::PushNumber(v)=>{
-                return push_number_instruction(*v)
+                return println!("OP_PUSH_NUMBER | '{}'", v);         
+            },
+
+            Operation::PushVar(_)=>{
+                return println!("OP_PUSH_VAR");
+            },
+            Operation::PopVars(n)=>{
+                return println!("OP_POP_VARS | {}",n);
+            },
+            Operation::DefineVar(n)=>{
+                return println!("OP_DEFINE_VAR | {}",n);
             },
 
             Operation::Equal => {
@@ -104,6 +118,7 @@ pub mod debug {
     /// Prints the instruction set into the 
     /// terminal... not really used outside of
     /// development environments
+    #[cfg(test)]
     pub fn chunk(chunk : &Chunk, name: String){
         
         println!("== {} ==\n", name);
@@ -124,7 +139,7 @@ pub mod debug {
     
             TokenType::Comma => "COMMA", TokenType::Dot => "DOT",
             TokenType::Minus => "MINUS", TokenType::Plus => "PLUS",  
-            TokenType::Semicolon => "SEMICOLON", TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
+            TokenType::Colon=>{"COLON"},TokenType::Semicolon => "SEMICOLON", TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
             
             TokenType::Bang => "BANG!", TokenType::BangEqual => "BANG! EQUAL",
             TokenType::Equal => "EQUAL", TokenType::EqualEqual => "EQUAL EQUAL",
@@ -146,12 +161,13 @@ pub mod debug {
             TokenType::If => "IF",
             TokenType::In => "IN",
             TokenType::Let => "LET",
-            TokenType::Nil => "NIL",
+            //TokenType::Nil => "NIL",
             TokenType::Or => "OR",
             TokenType::Return => "RETURN",
             TokenType::TokenSelf => "SELF",
             TokenType::True => "TRUE",
             TokenType::While => "WHILE",
+            TokenType::Class => "CLASS",
 
         }
     }
@@ -174,6 +190,7 @@ pub mod debug {
         use super::*;
         use crate::values::*;
     
+        /*
         #[test]
         fn test_dissassemble(){
             let v = 1.2;
@@ -185,5 +202,6 @@ pub mod debug {
             
             chunk(&c, "The chunk".to_string());        
         }
+        */
     }
 }

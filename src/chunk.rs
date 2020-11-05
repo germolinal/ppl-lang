@@ -1,11 +1,14 @@
+
+
 use crate::operations::*;
 use crate::values::Value;
 
 /// Represents a set of operations and values
+
 pub struct Chunk<'a> {
 
     /// The sequential instructions to carry out
-    code : Vec<Operation>,
+    code : Vec<Operation<'a>>,
 
     /// The values contained in the code
     constants : Vec<Value<'a>>,
@@ -16,7 +19,7 @@ pub struct Chunk<'a> {
 
 impl <'a>Chunk<'a> { 
 
-    /// Crates a new empty Chunk
+    /// Crates a new empty Chunk    
     pub fn new()->Self{
         Self{
             code: Vec::with_capacity(1024),
@@ -25,6 +28,7 @@ impl <'a>Chunk<'a> {
         }
     }
 
+    
     pub fn code(&self)->&Vec<Operation>{
         &self.code
     }
@@ -34,6 +38,7 @@ impl <'a>Chunk<'a> {
         &self.constants
     }
 
+    
     pub fn lines(&self)->&Vec<usize>{
         &self.lines
     }
@@ -43,15 +48,15 @@ impl <'a>Chunk<'a> {
     /// Writes an operation into the Chunk
     /// # Arguments
     /// * op: The Operation
-    /// * line: The line of the script from which the operation was dispatched
-    pub fn write_operation(&mut self, op : Operation, line: usize){       
+    /// * line: The line of the script from which the operation was dispatched    
+    pub fn write_operation(&mut self, op : Operation<'a>, line: usize){       
         self.code.push(op);
         self.lines.push(line);
     }
     
     /// Adds a value to the Chunk
     /// # Arguments
-    /// * v: the value to add
+    /// * v: the value to add    
     pub fn add_constant(&mut self, v : Value<'a>)-> usize {
         //if self.constants.len() >= (std::u8::MAX-1) as usize {
         //    panic!("The max number of constants in chunk ({}) has been exceeded", std::u8::MAX);
@@ -95,21 +100,17 @@ mod tests {
         let mut c = Chunk::new();
         let i = c.add_constant(Value::new_number(v));
 
-        if let found = c.constants[0] {            
-            assert_eq!(v,found.unrwap_number().unwrap());
-            assert_eq!(i,0);
-        }else{
-            assert!(false);
-        }
+        let found = c.constants[0];
+        assert_eq!(v,found.unrwap_number().unwrap());
+        assert_eq!(i,0);
+        
 
 
         let i = c.add_constant(Value::new_number(2.0*v));
 
-        if let found = c.constants[1] {            
-            assert_eq!(v*2.0,found.unrwap_number().unwrap());
-            assert_eq!(i,1);
-        }else{
-            assert!(false);
-        }
+        let found = c.constants[1];
+        assert_eq!(v*2.0,found.unrwap_number().unwrap());
+        assert_eq!(i,1);
+        
     }
 }

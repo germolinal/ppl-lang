@@ -10,7 +10,7 @@ pub enum TokenType{
     LeftParen, RightParen,
     LeftBrace, RightBrace,
     Comma, Dot, Minus, Plus,
-    Semicolon, Slash, Star,
+    Colon, Semicolon, Slash, Star,
 
     // One or two characters
     Bang, BangEqual,
@@ -26,11 +26,12 @@ pub enum TokenType{
     // Keywords
     And,
     Break,
+    Class,
     Else,
     False, Function, For,
     If, In,
     Let,
-    Nil,
+    //Nil,
     Or,
     Return,
     TokenSelf,

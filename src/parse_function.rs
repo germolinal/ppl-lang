@@ -1,7 +1,7 @@
 use crate::parser::*;
 use crate::token::*;
 use crate::operations::*;
-use crate::values::*;
+
 
 /* PARSING FUNCTIONS */
 
@@ -104,8 +104,7 @@ pub fn binary(parser: &mut Parser){
 pub fn literal(parser: &mut Parser){
     match parser.previous().token_type(){
         TokenType::False => parser.emit_byte(Operation::PushBool(false)),
-        TokenType::True => parser.emit_byte(Operation::PushBool(true)),
-        TokenType::Nil => parser.emit_byte(Operation::PushNil),
+        TokenType::True => parser.emit_byte(Operation::PushBool(true)),        
         _ => parser.internal_error_at_current(format!("Unknown Token in literal()")) 
     }
 }

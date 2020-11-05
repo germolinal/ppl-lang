@@ -95,10 +95,12 @@ impl <'a>Scanner<'a> {
     }
 
     
+    /*
     fn is_at_end(&self)->bool{    
         //self.current_index == self.source.len()
         self.finished
     }
+    */
     
     fn peek(&self)->char{
         if self.finished {
@@ -243,6 +245,11 @@ impl <'a>Scanner<'a> {
                     return Token::new(self,TokenType::Break);
                 };
             },
+            'c' => { // class
+                if self.check_keyword("class"){
+                    return Token::new(self,TokenType::Class);
+                }
+            },
             'e' => { // else
                 if self.check_keyword("else"){
                     return Token::new(self,TokenType::Else);
@@ -291,12 +298,14 @@ impl <'a>Scanner<'a> {
                     return Token::new(self,TokenType::Let);
                 }
             },
+            /*
             'n' => {//nil
                 if self.check_keyword("nil"){
                     return Token::new(self,TokenType::Nil);
                 }
             },
-            'o' => {//nil
+            */
+            'o' => {//or
                 if self.check_keyword("or"){
                     return Token::new(self,TokenType::Or);
                 }
@@ -1099,19 +1108,7 @@ mod tests {
             },
             _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
-
-        // nil 
-        let raw_source = format!("nil false and more elements");
-        let source : Vec<u8> = raw_source.into_bytes();
-        let mut scanner = Scanner::new(&source);
-
-        let token = scanner.scan_token();
-        match token.token_type() {
-            TokenType::Nil => {                                
-
-            },
-            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
-        };
+        
 
         // or
 

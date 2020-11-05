@@ -1,5 +1,9 @@
 extern crate ppl_lib;
 use std::env;
+use std::fs;
+use ppl_lib::vm::VM;
+use ppl_lib::parser::Parser;
+
 
 pub fn main(){
     let args: Vec<String> = env::args().collect();
@@ -8,9 +12,13 @@ pub fn main(){
     
     //let query = &args[1];
     let filename = &args[1];
+    let script = fs::read(filename).unwrap();
+
+    let mut parser = Parser::new(&script);
+    parser.program();
+    let _vm = VM::new();    
 
     // file contents.
-    // let script = fs::read(filename).unwrap();
 
 //    println!("Searching for {}", query);
     println!("In file {}", filename);
