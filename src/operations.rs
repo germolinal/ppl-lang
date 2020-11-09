@@ -1,8 +1,9 @@
-use crate::variable::*;
+//use crate::variable::*;
+use crate::variable::Var;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
-pub enum Operation<'a> {
+pub enum Operation {
     Return,
     Negate,
     Not,
@@ -11,14 +12,17 @@ pub enum Operation<'a> {
     Multiply,
     Divide,    
     Equal,
+    NotEqual,
     Greater,
     Less,
+    GreaterEqual,
+    LessEqual,
     //Constant(usize),
     PushBool(bool),
     PushNumber(f64),  
-    PushVar(Var<'a>),
     PopVars(usize),
     DefineVar(usize),
+    PushVar(Var),
 }
 
 

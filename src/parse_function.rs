@@ -3,6 +3,7 @@ use crate::token::*;
 use crate::operations::*;
 
 
+
 /* PARSING FUNCTIONS */
 
 pub fn unary(parser: &mut Parser){
@@ -79,22 +80,19 @@ pub fn binary(parser: &mut Parser){
             parser.emit_byte(Operation::Equal)
         },
         TokenType::BangEqual => {
-            parser.emit_byte(Operation::Equal);
-            parser.emit_byte(Operation::Not)
+            parser.emit_byte(Operation::NotEqual);            
         },
         TokenType::Greater =>{
             parser.emit_byte(Operation::Greater)
         },
         TokenType::GreaterEqual=>{
-            parser.emit_byte(Operation::Less);
-            parser.emit_byte(Operation::Not);
+            parser.emit_byte(Operation::GreaterEqual);            
         },
         TokenType::Less =>{
             parser.emit_byte(Operation::Less);
         },
         TokenType::LessEqual => {
-            parser.emit_byte(Operation::Greater);
-            parser.emit_byte(Operation::Not);
+            parser.emit_byte(Operation::LessEqual);
         },
         _ => parser.internal_error_at_current(format!("Unknown Token for Binary operation"))
     }

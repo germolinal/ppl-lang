@@ -26,7 +26,7 @@ pub mod debug {
     /// # Arguments:
     /// * op: The operation to be unassembled
     pub fn operation(chunk: &Chunk, offset: usize) {        
-        let ops = &chunk.code();
+        let ops = chunk.code();
         let op = &ops[offset];
         let ln = chunk.lines()[offset];
         print!("{:04} ", offset);    
@@ -103,14 +103,24 @@ pub mod debug {
             Operation::Equal => {
                 return simple_instruction("OP_EQUAL", offset );
             },
+            Operation::NotEqual => {
+                return simple_instruction("OP_NOT_EQUAL", offset );
+            },
 
             Operation::Greater => {
                 return simple_instruction("OP_GREATER", offset );
             },
+            Operation::GreaterEqual => {
+                return simple_instruction("OP_GREATER_EQUAL", offset );
+            },
 
             Operation::Less => {
                 return simple_instruction("OP_LESS", offset );
-            }
+            },
+            Operation::LessEqual => {
+                return simple_instruction("OP_LESS_EQUAL", offset );
+            },
+
         }
         
     }
@@ -139,8 +149,9 @@ pub mod debug {
     
             TokenType::Comma => "COMMA", TokenType::Dot => "DOT",
             TokenType::Minus => "MINUS", TokenType::Plus => "PLUS",  
-            TokenType::Colon=>{"COLON"},TokenType::Semicolon => "SEMICOLON", TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
-            
+            TokenType::Colon=>{"COLON"}, TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
+            /*TokenType::Semicolon => "SEMICOLON",*/
+
             TokenType::Bang => "BANG!", TokenType::BangEqual => "BANG! EQUAL",
             TokenType::Equal => "EQUAL", TokenType::EqualEqual => "EQUAL EQUAL",
             TokenType::Greater => "GREATER", TokenType::GreaterEqual => "GREATER EQUAL",
@@ -187,8 +198,8 @@ pub mod debug {
     
     #[cfg(test)]
     mod tests {
-        use super::*;
-        use crate::values::*;
+        //use super::*;
+        //use crate::values::*;
     
         /*
         #[test]

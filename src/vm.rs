@@ -2,6 +2,8 @@ use crate::chunk::*;
 use crate::operations::*;
 use crate::values::*;
 use crate::variable::Var;
+use crate::stack::Stack;
+use crate::value_trait::ValueTrait;
 
 #[cfg(debug_assertions)]
 use crate::debug::*;
@@ -21,18 +23,19 @@ impl InterpretResult {
     }
 }
 
-pub struct VM<'a> {
-    stack: Vec<Value<'a>>,//[Value<'a>;256],    
-    var_stack: Vec<Var<'a>>,//[Var<'a>;256],    
+pub struct VM {
+    stack: Stack<Value>,
+    var_stack: Stack<Var>,
 }
 
-impl <'a>VM<'a> {
+
+impl VM {
     
     pub fn new()-> Self{
                     
         Self{
-            var_stack: Vec::with_capacity(256), 
-            stack: Vec::with_capacity(256),            
+            var_stack: Stack::new(Var::new()),//Vec::with_capacity(256), 
+            stack: Stack::new(Value::Nil),//Vec::with_capacity(256),            
         }
     }    
 
@@ -42,44 +45,8 @@ impl <'a>VM<'a> {
         return InterpretResult::Ok;
     }
 
-    pub fn get_a_b_numbers(&mut self)->Result<(f64,f64),InterpretResult>{
-        let errmsg = "Expecting two 'Numbers'";
-
-        // Get b 
-        let b = if let Value::Number(v) = self.pop(){
-            v
-        }else{
-            return Err(InterpretResult::RuntimeError(errmsg.to_string()));
-        };
-
-        // get a        
-        let a = if let Value::Number(v) = self.pop(){
-            v
-        }else{
-            return Err(InterpretResult::RuntimeError(errmsg.to_string()));
-        };
-
-        return Ok((a,b));
-    }
-
-    pub fn get_number(&mut self)->Result<f64,InterpretResult>{
-        // Get b 
-        if let Value::Number(v) = self.pop(){
-            return Ok(v)
-        }else{
-            return Err(InterpretResult::RuntimeError(format!("Expecting 'Number'")));
-        };
-    }
-
-    pub fn get_boolean(&mut self)->Result<bool,InterpretResult>{     
-        if let Value::Bool(v) = self.pop(){
-            return Ok(v)
-        }else{
-            return Err(InterpretResult::RuntimeError(format!("Expecting 'Boolean'")));
-        };
-    }
-
-    pub fn run(&mut self, chunk: &'a Chunk) -> InterpretResult {
+    
+    pub fn run(&mut self, chunk: & Chunk) -> InterpretResult {
         
         for (_offset,op) in chunk.code().iter().enumerate(){
 
@@ -91,8 +58,9 @@ impl <'a>VM<'a> {
                 // report stack
                 print!("  --> Stack: [");
                                             
-                for op in &self.stack {
-                    print!("{}, ", op.to_string());                    
+                for i in 0..self.stack.len() {
+                    let val = self.stack[i];
+                    print!("{}, ", val.to_string());                    
                 }
                 print!("]\n");
 
@@ -115,181 +83,123 @@ impl <'a>VM<'a> {
                 },
                 */
                 Operation::PushBool(v)=>{
-                    self.push(Value::new_bool(*v))
+                    self.push(Value::Bool(*v))
                 },                
                 Operation::PushNumber(v)=>{
-                    self.push(Value::new_number(*v))
+                    self.push(Value::Number(*v))
                 },
                 Operation::PushVar(v)=>{
                     self.push_var(*v);
                 },
                 Operation::PopVars(n)=>{                    
-                    self.pop_vars(*n);                    
-                },
-                Operation::DefineVar(n)=>{
-                    let v = self.pop();
-                    self.var_stack[*n].value = v;
-                },
-                // Unary operations
-                Operation::Negate =>{
-                    match self.get_number(){
-                        Ok(v)=>self.push(Value::new_number(-v)),
-                        Err(e)=>return e
+                    for _ in 0..*n {
+                        self.pop_var();                    
                     }
                 },
+                Operation::DefineVar(n)=>{
+                    let v = self.pop();                    
+                    self.var_stack[*n].value = v;
+                    self.var_stack[*n].initialized = true;
+                },
+                // Unary operations
+                Operation::Negate =>{                    
+                    match self.pop().negate(){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }
+                    
+                },
                 Operation::Not =>{
-                    match self.get_boolean(){
-                        Ok(v)=>self.push(Value::new_bool(!v)),
-                        Err(e)=>return e
+                    match self.pop().not(){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
                     }                                
                 },
 
                 // Binary operations
                 Operation::Add => {    
-                    match self.get_a_b_numbers(){
-                        Ok((a,b))=>{
-                            self.push(Value::new_number(a + b));                 
-                        },
-                        Err(e)=>return e
-                    };
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.add(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }  
                 },                
                 Operation::Subtract => {    
-                    match self.get_a_b_numbers(){
-                        Ok((a,b))=>{
-                            self.push(Value::new_number(a - b));                 
-                        },
-                        Err(e)=>return e
-                    };              
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.subtract(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }               
                 },                
                 Operation::Multiply => {    
-                    match self.get_a_b_numbers(){
-                        Ok((a,b))=>{
-                            self.push(Value::new_number(a * b));                 
-                        },
-                        Err(e)=>return e
-                    };           
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.multiply(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }           
                 },                
                 Operation::Divide => {    
-                    match self.get_a_b_numbers(){
-                        Ok((a,b))=>{
-                            self.push(Value::new_number(a / b));                 
-                        },
-                        Err(e)=>return e
-                    };
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.divide(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }       
                 },
                 Operation::Equal => {
-                    // Get b (from a == b)            
-                    let value_b = self.pop();
-                    let type_b = value_b.value_type();
-                    // Get a (from a == b)            
-                    let value_a = self.pop();
-                    let type_a = value_a.value_type();
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.compare_equal(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }       
+                                                        
+                },
 
-                    //
-                    if type_a != type_b {
-                        self.push(Value::new_bool(false));                                           
-                    }else{
-                        let b = match value_b.value_type(){
-                            ValueType::Number => {
-                                match value_b.unrwap_number(){
-                                    Ok(v)=>v,
-                                    Err(e)=>return InterpretResult::RuntimeError(e)
-                                }
-                            },
-                            _ => return InterpretResult::RuntimeError(format!("Trying to == over type '{}'", value_b.typename()))
-                        };
-                        
-                        
-                        let a = match value_a.value_type(){
-                            ValueType::Number => {
-                                match value_a.unrwap_number(){
-                                    Ok(v)=>v,
-                                    Err(e)=>return InterpretResult::RuntimeError(e)
-                                }
-                            },
-                            _ => return InterpretResult::RuntimeError(format!("Trying to == over type '{}'", value_b.typename()))
-                        };
-    
-                        // Emit operation
-                        self.push(Value::new_bool(a == b));   
-                    }
+                Operation::NotEqual => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.compare_not_equal(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }       
                                                         
                 },
                 Operation::Greater => {
-                    // Get b (from a == b)            
-                    let value_b = self.pop();
-                    let type_b = value_b.value_type();
-                    // Get a (from a == b)            
-                    let value_a = self.pop();
-                    let type_a = value_a.value_type();
-
-                    //
-                    if type_a != type_b {
-                        self.push(Value::new_bool(false));                   
-                        
-                    }else{
-                        let b = match value_b.value_type(){
-                            ValueType::Number => {
-                                match value_b.unrwap_number(){
-                                    Ok(v)=>v,
-                                    Err(e)=>return InterpretResult::RuntimeError(e)
-                                }
-                            },
-                            _ => return InterpretResult::RuntimeError(format!("Trying to == over type '{}'", value_b.typename()))
-                        };
-                        
-                        
-                        let a = match value_a.value_type(){
-                            ValueType::Number => {
-                                match value_a.unrwap_number(){
-                                    Ok(v)=>v,
-                                    Err(e)=>return InterpretResult::RuntimeError(e)
-                                }
-                            },
-                            _ => return InterpretResult::RuntimeError(format!("Trying to == over type '{}'", value_b.typename()))
-                        };
-    
-                        // Emit operation
-                        self.push(Value::new_bool(a > b));   
-                    }
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.greater(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }   
                 },
                 Operation::Less => {
-                    // Get b (from a == b)            
-                    let value_b = self.pop();
-                    let type_b = value_b.value_type();
-                    // Get a (from a == b)            
-                    let value_a = self.pop();
-                    let type_a = value_a.value_type();
-
-                    //
-                    if type_a != type_b {
-                        self.push(Value::new_bool(false));                   
-                        
-                    }else{
-                        let b = match value_b.value_type(){
-                            ValueType::Number => {
-                                match value_b.unrwap_number(){
-                                    Ok(v)=>v,
-                                    Err(e)=>return InterpretResult::RuntimeError(e)
-                                }
-                            },
-                            _ => return InterpretResult::RuntimeError(format!("Trying to == over type '{}'", value_b.typename()))
-                        };
-                        
-                        
-                        let a = match value_a.value_type(){
-                            ValueType::Number => {
-                                match value_a.unrwap_number(){
-                                    Ok(v)=>v,
-                                    Err(e)=>return InterpretResult::RuntimeError(e)
-                                }
-                            },
-                            _ => return InterpretResult::RuntimeError(format!("Trying to == over type '{}'", value_b.typename()))
-                        };
-    
-                        // Emit operation
-                        self.push(Value::new_bool(a < b));   
-                    }
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.less(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }                       
+                },
+                Operation::GreaterEqual => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.greater_equal(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }   
+                },
+                Operation::LessEqual => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    match a.less_equal(b){
+                        Ok(v)=>self.push(v),
+                        Err(e)=>return InterpretResult::RuntimeError(e)
+                    }   
+                    
                 }
 
             }
@@ -299,23 +209,23 @@ impl <'a>VM<'a> {
         
     }
 
-    pub fn push(&mut self, value: Value<'a> ) {        
+    pub fn push(&mut self, value: Value ) {        
         self.stack.push(value);        
     }
 
-    fn push_var(&mut self,var: Var<'a>){
+    fn push_var(&mut self,var: Var){
         self.var_stack.push(var);     
     }
 
-    fn pop_vars(&mut self, n: usize){
-        for _ in 0..n{
-            if !self.var_stack.pop().is_some(){
-                panic!("Trying to pop an empty variable stack")
-            }            
-        }
+    fn pop_var(&mut self)->Var{        
+        if let Some(v)= self.var_stack.pop(){
+            v
+        }else{
+            panic!("Trying to pop an empty stack")
+        }   
     }
 
-    pub fn pop(&mut self)->Value<'a>{
+    pub fn pop(&mut self)->Value{
         if let Some(v)= self.stack.pop(){
             v
         }else{
@@ -336,7 +246,7 @@ mod tests {
     
     #[test]
     #[should_panic]
-    fn test_pop_empty_stack(){
+    fn test_pocp_empty_stack(){
         let mut vm = VM::new();
         vm.pop();
     }
@@ -346,18 +256,18 @@ mod tests {
         let mut vm = VM::new();
         
         assert_eq!(vm.stack.len(),0);
-        match vm.stack[0].value_type(){
-            ValueType::Nil => {},
+        match vm.stack[0]{
+            Value::Nil => {},
             _ => {assert!(false)}
         }
         
         
-        vm.push(Value::new_number(1.2));
+        vm.push(Value::Number(1.2));
         assert_eq!(vm.stack.len(),1);
 
-        match vm.stack[0].value_type(){
-            ValueType::Number => {
-                assert_eq!(vm.stack[0].unrwap_number().unwrap(),1.2);
+        match vm.stack[0]{
+            Value::Number(v) => {
+                assert_eq!(v,1.2);
             },
             _ => {assert!(false)}
         }
@@ -365,9 +275,9 @@ mod tests {
         let value = vm.pop();
         assert_eq!(vm.stack.len(),0);
         
-        match value.value_type() {
-            ValueType::Number => {
-                assert_eq!(value.unrwap_number().unwrap(),1.2);
+        match value{
+            Value::Number(v) => {
+                assert_eq!(v,1.2);
             },
             _ => {assert!(false)}
         }
@@ -402,8 +312,9 @@ mod tests {
         c.write_operation(Operation::Negate, 124);
         c.write_operation(Operation::Return, 0);                        
         let mut vm = VM::new();
-        assert!(vm.run(&c).is_ok());        
-        let v2 = vm.pop().to_f64().unwrap();
+        assert!(vm.run(&c).is_ok()); 
+
+        let v2 = vm.pop().get_number().unwrap();
         assert_eq!(v2,-v);
         
             
@@ -453,7 +364,7 @@ mod tests {
         let mut vm = VM::new();
         assert!(vm.run(&chunk).is_ok());                
 
-        let c = vm.pop().to_f64().unwrap();
+        let c = vm.pop().get_number().unwrap();
         assert_eq!(a+b,c);
 
         
@@ -488,7 +399,7 @@ mod tests {
         let mut vm = VM::new();
         assert!(vm.run(&chunk).is_ok());                
 
-        let c = vm.pop().to_f64().unwrap();
+        let c = vm.pop().get_number().unwrap();
         assert_eq!(a-b,c);
 
         
@@ -524,7 +435,7 @@ mod tests {
         let mut vm = VM::new();
         assert!(vm.run(&chunk).is_ok());                
 
-        let c = vm.pop().to_f64().unwrap();
+        let c = vm.pop().get_number().unwrap();
         assert_eq!(a*b,c);
 
         
@@ -559,7 +470,7 @@ mod tests {
         let mut vm = VM::new();
         assert!(vm.run(&chunk).is_ok());                
 
-        let c = vm.pop().to_f64().unwrap();
+        let c = vm.pop().get_number().unwrap();
         assert_eq!(a / b,c);
 
         

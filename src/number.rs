@@ -1,42 +1,105 @@
-use crate::values::*;
+use crate::value_trait::ValueTrait;
+use crate::values::Value;
 
-impl <'a>Value<'a> {
 
-    /// Transforms a Value into a Int. Meant to be used
-    /// externally through the API
-    pub fn to_ppl_number(&self)->Result<Value,String>{
-        match self {
-            // Numbers are easy
-            Value::Number(v) => Ok(Value::Number(*v as f64)),
-            
-            /*
-            // Let's try with string
-            Value::(v)=>{
-                let s = v.parse::<i32>();
-                match s {
-                    Ok(v) => Ok(PPLValue::PPLInt(v)),
-                    Err(_) => Err(format!("Cannot transform string {} into '{}'", v,PPLValue::PPLInt(1).ppl_type()))
-                }                
-            }
-            */
-            // Everything else panics
-            _ => panic!("Cannot transform type {} into 'Number'", self.typename())
+pub type Number = f64;
+
+impl ValueTrait for Number {
+    
+    fn to_string(&self) -> String {
+        return format!("{}",self);
+    }
+
+    fn type_name(&self)->String{
+        return format!("Number")
+    }
+
+
+    fn negate(&self)->Result<Value,String>{        
+        Ok(Value::Number(-self))
+    }
+
+    fn add(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Number(self + v))
+            },
+            _ => Err(format!("Cannot add '{}' and '{}'", self.type_name(), other.type_name()))
+        }        
+    }
+
+    fn subtract(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Number(self - v))
+            },
+            _ => Err(format!("Cannot subtract '{}' and '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn multiply(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Number(self * v))
+            },
+            _ => Err(format!("Cannot multiply '{}' and '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn divide(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Number(self /v ))
+            },
+            _ => Err(format!("Cannot divide '{}' by '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn compare_equal(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Bool(*self == v))                
+            },
+            _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn greater(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Bool(*self > v))                
+            },
+            _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn less(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Bool(*self < v))                
+            },
+            _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn greater_equal(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Bool(*self >= v))                
+            },
+            _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
+        }
+    }
+
+    fn less_equal(&self, other: Value)->Result<Value,String>{
+        match other {
+            Value::Number(v) => {
+                Ok(Value::Bool(*self <= v))                
+            },
+            _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }
     }
 
 }
 
 
-/***********/
-/* TESTING */
-/***********/
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_to_pplint() {
-        
-    }
-}

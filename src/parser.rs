@@ -40,9 +40,9 @@ pub struct Parser<'a>{
     had_error: bool,
     panic_mode: bool,
     scanner: Scanner<'a>,
-    chunk: Chunk<'a>,
+    chunk: Chunk,
     
-    variables: Vec<NamedVar<'a>>,
+    variables: Vec<NamedVar>,
     variable_count: Vec<usize>,
 }
 
@@ -66,6 +66,12 @@ impl <'a>Parser<'a>{
     }
 
     /* UTILITY FUNCTIONS */
+
+    #[cfg(debug_assertions)]
+    #[allow(dead_code)]
+    fn show_tokens(&self, msg: &str){
+        println!("at {} == previous: {} | current: {}", msg, debug::token(self.previous,self.scanner.source()), debug::token(self.current, self.scanner.source()));
+    }
 
     fn scope_depth(&self)->usize{
         self.variable_count.len()
@@ -110,6 +116,14 @@ impl <'a>Parser<'a>{
         false
     }
 
+    pub fn consume_previous(&mut self, expected_type: TokenType)->bool{
+        if self.previous.token_type() == expected_type {
+            self.advance();
+            return true;
+        }        
+        false
+    }
+
     fn check(&self, t: TokenType)->bool{
         self.current.token_type() == t
     }
@@ -124,7 +138,7 @@ impl <'a>Parser<'a>{
     }
     
 
-    pub fn emit_byte(&mut self, op: Operation<'a>){
+    pub fn emit_byte(&mut self, op: Operation){
         self.chunk.write_operation(op, self.previous.line());
     }
     /*
@@ -152,7 +166,7 @@ impl <'a>Parser<'a>{
         match ttype{
             TokenType::RightParen | 
             TokenType::LeftBrace | TokenType::RightBrace |
-            TokenType::Comma | TokenType::Semicolon |
+            TokenType::Comma | //TokenType::Semicolon |
             TokenType::Equal |
             TokenType::Class | 
             TokenType::Else |
@@ -227,8 +241,8 @@ impl <'a>Parser<'a>{
                     infix: Some(binary),
                 }
             },
-            /*
-            TokenType::True |TokenType::False | TokenType::Nil => {
+            
+            TokenType::True | TokenType::False => {
                 ParseRule{
                     precedence: Precedence::None,
                     next_precedence: Some(Precedence::Assignment),
@@ -236,7 +250,7 @@ impl <'a>Parser<'a>{
                     infix: None,
                 }
             },
-            */
+            
             TokenType::BangEqual | TokenType::EqualEqual =>{
                 ParseRule{
                     precedence: Precedence::Equality,
@@ -342,12 +356,14 @@ impl <'a>Parser<'a>{
         }
     
         // All good to go. Create default values
-        let var_type = ValueType::Nil;
+        let typed = false;
         let val = Value::Nil;
+        let initialized = false;
 
         // Check if it has a type                        
         if let TokenType::Colon = self.current.token_type(){
-            // let x : String            
+            // let x : String     
+            //typed = true;
             unimplemented!();
             // Expect type, consume
         }
@@ -356,7 +372,8 @@ impl <'a>Parser<'a>{
         self.variables.push(NamedVar{
             name: var_name,
             value: val,
-            value_type: var_type,
+            typed: typed,
+            initialized: initialized,
         });
         let depth = self.variable_count.len();
         self.variable_count[depth-1] += 1;
@@ -364,7 +381,8 @@ impl <'a>Parser<'a>{
         // Emit operation for the VM.
         self.emit_byte(Operation::PushVar(Var{
             value: val,
-            value_type: var_type
+            typed: typed,
+            initialized: false,
         }));
 
 
@@ -372,20 +390,39 @@ impl <'a>Parser<'a>{
         if self.match_token(TokenType::Equal){            
             // Put value of expression on the stack                        
             self.expression();            
-
+            
             self.emit_byte(Operation::DefineVar(self.variables.len()-1))            
         }
 
+        // forget about all this and continue
+        //self.advance(); 
+    }
+
+    /// Compiles a for statement
+    /// 
+    /// # EBNF Grammar:
+    /// for_statement -> for identifier in expression  block
+    fn for_statement(&mut self){
+        println!("FOR STATEMENT -- previous {} | current {}",debug::token(self.previous, self.scanner.source()),debug::token(self.current, self.scanner.source()));        
+        // Open the scope for this for statement.
+        self.begin_scope();
+
+        // consume the var declaration
+        self.var_declaration();
+        println!("FOR STATEMENT  after var_decl -- previous {} | current {}",debug::token(self.previous, self.scanner.source()),debug::token(self.current, self.scanner.source()));        
+        // consume 'in', or fail
+        if self.previous.token_type() != TokenType::In {
+            return self.error_at_current(format!("Expecting keyword 'in' when declaring For loop."));
+        }
+        println!("FOR STATEMENT  before expression -- previous {} | current {}",debug::token(self.previous, self.scanner.source()),debug::token(self.current, self.scanner.source()));        
+        // Evaluate the element to iterate over
+        self.expression();
+        println!("FOR STATEMENT  after expression -- previous {} | current {}",debug::token(self.previous, self.scanner.source()),debug::token(self.current, self.scanner.source()));        
+        
+        self.block();
+        self.end_scope();
 
 
-
-        // Leave the semicolon behind                    
-        if !self.consume(TokenType::Semicolon){
-            return self.error_at_current(format!("Expecting ';' after variable declaration."));
-        }        
-
-        // Make the semicolon disappear...
-        self.advance(); 
     }
 
     /// Compiles a statement
@@ -394,7 +431,7 @@ impl <'a>Parser<'a>{
     /// statement -> expression | forStmt | ifStmt | returnStmt | whileStmt| block ;
     fn statement(&mut self){  
         
-        println!("previous {} | current {}",debug::token(self.previous, self.scanner.source()),debug::token(self.current, self.scanner.source()));        
+        
 
         match self.previous().token_type(){
             TokenType::LeftBrace => {
@@ -403,9 +440,9 @@ impl <'a>Parser<'a>{
                 self.block();
                 self.end_scope();
             },
-            TokenType::For =>{
+            TokenType::For => {
                 self.advance();
-                unimplemented!();
+                self.for_statement();
             },
             TokenType::If =>{
                 self.advance();
@@ -430,7 +467,7 @@ impl <'a>Parser<'a>{
     /// Compiles an expression
     /// # EBFN Grammar:
     /// expression -> literal | unary | binary | grouping;
-    pub fn expression(&mut self){            
+    pub fn expression(&mut self){                    
         self.parse_precedence(Precedence::Assignment);
     }
 
@@ -537,8 +574,7 @@ impl <'a>Parser<'a>{
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::debug::*;
+    use super::*;    
 
     #[test]
     fn test_parser_new(){
@@ -629,7 +665,7 @@ mod tests {
 
     #[test]
     fn test_add_expression(){
-        let raw_source = "!(5 - 4 > 3 * 2 2 == !nil 3*2".to_string();
+        let raw_source = "= !( 5 - 4 > 3 * 22 == !false) ".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
@@ -639,32 +675,64 @@ mod tests {
 
     #[test]
     fn test_var_declaration(){
-        let raw_source = "let x = 2; let y; let z = 5;".to_string();
+        let raw_source = "let x = 2 let y let z = true".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
         parser.program();
 
         assert_eq!(3,parser.variables.len());
-        assert_eq!(parser.variables[0].name,"x".to_string());
-        assert_eq!(parser.variables[1].name,"y".to_string());
-        assert_eq!(parser.variables[2].name,"z".to_string());
         
+        assert_eq!(parser.variables[0].name,"x".to_string());
+        let x = parser.variables.get(0).unwrap();
+        if let Value::Number(v) = x.value {
+            assert_eq!(v,2.);
+        }
+        if let Value::Nil = x.value {
+            assert!(true);
+        }else{
+            assert!(false);
+        }
+        
+        assert_eq!(parser.variables[1].name,"y".to_string());
+        let y = parser.variables.get(1).unwrap();
+        if let Value::Nil = x.value {
+            assert!(true);
+        }
+        if let Value::Nil = y.value {
+            assert!(true);
+        }else{
+            assert!(false);
+        }
+
+        assert_eq!(parser.variables[2].name,"z".to_string());
+        let z = parser.variables.get(2).unwrap();
+        if let Value::Bool(v) = z.value {
+            assert!(v);
+        }
+        if let Value::Nil = y.value {
+            assert!(true);
+        }else{
+            assert!(false);
+        }
+        
+        debug::chunk(&parser.chunk,"the_chunk".to_string());
     }
 
     #[test]
     fn test_current_scope_has_variable(){
-        let raw_source = "{let x; let y; let z;}".to_string();
+        let raw_source = "let x {let y} let z".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
         parser.program();
         assert!(parser.current_scope_has_variable(&format!("x")));
+        assert!(!parser.current_scope_has_variable(&format!("y")));
     }
 
     #[test]
     fn test_scopes(){
-        let raw_source = "let x; {let y;} let z;".to_string();
+        let raw_source = "let x {let y } let z".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
@@ -679,8 +747,9 @@ mod tests {
         assert_eq!(parser.variable_count[0],0);
         
 
-        // Consume the first variable           
-        parser.declaration();        
+        // Consume the first variable  
+        parser.declaration();   
+         
         
         // There is only the "main" scope
         assert_eq!(parser.scope_depth(),1);     
@@ -689,14 +758,15 @@ mod tests {
         assert_eq!(parser.variable_count.len(),1);
         assert_eq!(parser.variable_count[0],1);
         if let Operation::PushVar(Var{
-            value_type: ValueType::Nil,
-            value: Value::Nil
+            value: Value::Nil,
+            typed: false,
+            initialized: false,
         }) = parser.chunk.code()[0]{
             assert!(true);
         }else{assert!(false)};
 
 
-        // Consume the block, with the variable                
+        // Consume the block, with the variable                        
         assert!(parser.consume(TokenType::LeftBrace));
         parser.advance(); 
         parser.begin_scope();
@@ -710,7 +780,8 @@ mod tests {
         assert_eq!(parser.variable_count[0],1);
         assert_eq!(parser.variable_count[1],1);
         if let Operation::PushVar(Var{
-            value_type: ValueType::Nil,
+            typed: false,
+            initialized: false,
             value: Value::Nil
         }) = parser.chunk.code()[1]{
             assert!(true);
@@ -735,12 +806,25 @@ mod tests {
         assert_eq!(parser.variables[1].name,"z".to_string());
         assert_eq!(parser.variable_count[0],2);
         if let Operation::PushVar(Var{
-            value_type: ValueType::Nil,
+            typed: false,
+            initialized: false,
             value: Value::Nil
         }) = parser.chunk.code()[1]{
             assert!(true);
         }else{assert!(false)};
         
         debug::chunk(&parser.chunk, format!("some chunck"));
+    }
+
+    #[test]
+    fn test_for_loop(){
+        let raw_source = "for var in 3 {let x}".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);
+        parser.program();
+
+        debug::chunk(&parser.chunk, format!("for loop chunck"));
+        
     }
 }

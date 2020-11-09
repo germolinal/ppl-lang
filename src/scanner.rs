@@ -395,7 +395,7 @@ impl <'a>Scanner<'a> {
             '.' => Token::new(self, TokenType::Dot),
             '-' => Token::new(self, TokenType::Minus),
             '+' => Token::new(self, TokenType::Plus),
-            ';' => Token::new(self, TokenType::Semicolon),
+            //';' => Token::new(self, TokenType::Semicolon),
             '/' => Token::new(self, TokenType::Slash),
             '*' => Token::new(self, TokenType::Star),
             
@@ -518,7 +518,7 @@ mod tests {
         };
 
         // 
-        let raw_source = "(){},.-+;*/".to_string();
+        let raw_source = "(){},.-+*/".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
         let mut scanner = Scanner::new(&source);
 
@@ -612,7 +612,7 @@ mod tests {
             },
             _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
-
+/*
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Semicolon => {
@@ -623,14 +623,14 @@ mod tests {
             },
             _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
-
+*/
         
 
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Star => {
-                assert_eq!(scanner.current_index,10);
-                assert_eq!(scanner.start_index,9);
+                assert_eq!(scanner.current_index,9);
+                assert_eq!(scanner.start_index,8);
                 let txt = token.source_text(&source);                
                 assert_eq!("*",txt);         
             },
@@ -640,8 +640,8 @@ mod tests {
         let token = scanner.scan_token();        
         match token.token_type() {
             TokenType::Slash => {
-                assert_eq!(scanner.current_index,11);
-                assert_eq!(scanner.start_index,10);
+                assert_eq!(scanner.current_index,10);
+                assert_eq!(scanner.start_index,9);
                 let txt = token.source_text(&source);                
                 assert_eq!("/",txt);                                            
             },
@@ -651,8 +651,8 @@ mod tests {
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::EOF => {
-                assert_eq!(scanner.current_index,11);
-                assert_eq!(scanner.start_index,11);
+                assert_eq!(scanner.current_index,10);
+                assert_eq!(scanner.start_index,10);
                 let txt = token.source_text(&source);                
                 assert_eq!("",txt);                                            
             },

@@ -1,30 +1,30 @@
 
 
 use crate::operations::*;
-use crate::values::Value;
+//use crate::values::ValueTrait;
 
 /// Represents a set of operations and values
 
-pub struct Chunk<'a> {
+pub struct Chunk {
 
     /// The sequential instructions to carry out
-    code : Vec<Operation<'a>>,
+    code : Vec<Operation>,
 
     /// The values contained in the code
-    constants : Vec<Value<'a>>,
+    //constants : Vec<dyn Value>,
 
     /// The lines at which each instruction was created
     lines : Vec<usize>,
 }
 
-impl <'a>Chunk<'a> { 
+impl Chunk { 
 
     /// Crates a new empty Chunk    
     pub fn new()->Self{
         Self{
-            code: Vec::with_capacity(1024),
-            constants: Vec::with_capacity(1024),
-            lines: Vec::with_capacity(1024),
+            code: Vec::new(),//Vec::with_capacity(1024),
+            //constants: Vec::new(),//with_capacity(1024),
+            lines: Vec::new(),//with_capacity(1024),
         }
     }
 
@@ -33,10 +33,11 @@ impl <'a>Chunk<'a> {
         &self.code
     }
 
-    
-    pub fn constants(&self)->&Vec<Value>{
+    /*
+    pub fn constants(&self)->&Vec<dyn ValueTrait>{
         &self.constants
     }
+    */
 
     
     pub fn lines(&self)->&Vec<usize>{
@@ -49,15 +50,16 @@ impl <'a>Chunk<'a> {
     /// # Arguments
     /// * op: The Operation
     /// * line: The line of the script from which the operation was dispatched    
-    pub fn write_operation(&mut self, op : Operation<'a>, line: usize){       
+    pub fn write_operation(&mut self, op : Operation, line: usize){       
         self.code.push(op);
         self.lines.push(line);
     }
     
+    /*
     /// Adds a value to the Chunk
     /// # Arguments
     /// * v: the value to add    
-    pub fn add_constant(&mut self, v : Value<'a>)-> usize {
+    pub fn add_constant(&mut self, v : dyn ValueTrait)-> usize {
         //if self.constants.len() >= (std::u8::MAX-1) as usize {
         //    panic!("The max number of constants in chunk ({}) has been exceeded", std::u8::MAX);
         //}
@@ -66,6 +68,7 @@ impl <'a>Chunk<'a> {
         self.constants.push(v);
         return ret;
     }
+    */
 
 }
 
@@ -82,7 +85,7 @@ mod tests {
     fn test_new() {
         let c = Chunk::new();        
         assert_eq!(0, c.code.len());
-        assert_eq!(0, c.constants.len());        
+        //assert_eq!(0, c.constants.len());        
     }
 
     #[test]
@@ -94,6 +97,7 @@ mod tests {
         
     }
 
+    /*
     #[test]
     fn test_add_constant(){
         let v = 1.2;
@@ -113,4 +117,5 @@ mod tests {
         assert_eq!(i,1);
         
     }
+    */
 }

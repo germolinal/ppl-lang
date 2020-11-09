@@ -1,15 +1,27 @@
 use crate::values::*;
 
-pub struct NamedVar<'a> {
+pub struct NamedVar {
     pub name: String,
-    pub value_type: ValueType,
-    pub value: Value<'a>,
+    pub typed: bool,
+    pub initialized: bool,
+    pub value: Value,
 }
 
 #[derive(Copy,Clone)]
-pub struct Var<'a> {    
-    pub value_type: ValueType,
-    pub value: Value<'a>,
+pub struct Var {    
+    pub typed: bool,
+    pub initialized: bool,
+    pub value: Value,
+}
+
+impl Var {
+    pub fn new()->Self{
+        Var{
+            typed: false,
+            initialized: false,
+            value: Value::Nil
+        }
+    }
 }
 
 
