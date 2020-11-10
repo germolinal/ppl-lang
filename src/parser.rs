@@ -356,8 +356,7 @@ impl <'a>Parser<'a>{
         }
     
         // All good to go. Create default values
-        let typed = false;
-        let val = Value::Nil;
+        let typed = false;        
         let initialized = false;
 
         // Check if it has a type                        
@@ -371,7 +370,7 @@ impl <'a>Parser<'a>{
         // Register variable in the parser
         self.variables.push(NamedVar{
             name: var_name,
-            value: val,
+            value: Value::Nil,
             typed: typed,
             initialized: initialized,
         });
@@ -380,7 +379,7 @@ impl <'a>Parser<'a>{
 
         // Emit operation for the VM.
         self.emit_byte(Operation::PushVar(Var{
-            value: val,
+            value: Value::Nil,
             typed: typed,
             initialized: false,
         }));

@@ -4,6 +4,8 @@ use crate::values::Value;
 
 pub type Number = f64;
 
+
+
 impl ValueTrait for Number {
     
     fn to_string(&self) -> String {
@@ -12,6 +14,10 @@ impl ValueTrait for Number {
 
     fn type_name(&self)->String{
         return format!("Number")
+    }
+
+    fn clone(&self)->Value{
+        Value::Number(*self)
     }
 
 

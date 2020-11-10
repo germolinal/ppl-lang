@@ -1,10 +1,15 @@
 use crate::values::Value;
 
 pub trait ValueTrait {
+    // Basic i/o
     fn to_string(&self)->String;
 
     fn type_name(&self)->String;
 
+    // Copy and clone
+    fn clone(&self)->Value;
+
+    // Operators
     fn not(&self)->Result<Value,String>{
         Err(format!("Operator '!' cannot be applied to type '{}'", self.type_name()))
     }

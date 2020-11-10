@@ -1,4 +1,5 @@
 use crate::values::*;
+use crate::value_trait::ValueTrait;
 
 pub struct NamedVar {
     pub name: String,
@@ -7,7 +8,7 @@ pub struct NamedVar {
     pub value: Value,
 }
 
-#[derive(Copy,Clone)]
+
 pub struct Var {    
     pub typed: bool,
     pub initialized: bool,
@@ -15,11 +16,20 @@ pub struct Var {
 }
 
 impl Var {
-    pub fn new()->Self{
+
+    pub fn copy(&self)->Self{
         Var{
-            typed: false,
-            initialized: false,
-            value: Value::Nil
+            typed: self.typed,
+            initialized: self.initialized,
+            value: self.value.copy()
+        }
+    }
+
+    pub fn clone(&self)->Self{
+        Var{
+            typed: self.typed,
+            initialized: self.initialized,
+            value: self.value.clone()
         }
     }
 }

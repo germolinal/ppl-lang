@@ -1,14 +1,14 @@
 
 mod values;
 mod value_trait;
-//mod generic;
 
 mod number;
 mod boolean;
 mod nil;
+mod object;
+mod array;
 
 mod variable;
-mod stack;
 
 mod operations;
 mod chunk;

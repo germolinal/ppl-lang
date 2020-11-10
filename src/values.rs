@@ -1,17 +1,16 @@
-//use std::rc::Rc;
+use std::rc::Rc;
 
 use crate::number::Number;
 use crate::boolean::Boolean;
 use crate::nil::Nil;
 use crate::value_trait::ValueTrait;
-//use crate::generic::Generic;
 
-#[derive(Copy, Clone)]
+
 pub enum Value {
     Nil,
     Number(Number),
     Bool(Boolean),
-    //Generic(Rc<dyn Generic>),
+    Generic(Rc<dyn ValueTrait>),
 }
 
 
@@ -31,14 +30,14 @@ impl Value {
         }
     }
 
-    /*
-    pub fn get_generic(&self)->Option<&Rc<dyn Generic>>{
+    
+    pub fn get_generic(&self)->Option<&Rc<dyn ValueTrait>>{
         match self {
             Value::Generic(v)=>Some(v),                            
             _ => None
         }
     }
-    */
+    
 
     pub fn is_nil(&self)->bool{
         match self {
@@ -47,7 +46,19 @@ impl Value {
         }
     }
 
+    
+    pub fn copy(&self)-> Value {
+        match self {
+            Value::Nil => Value::Nil,
+            Value::Number(v) => ValueTrait::clone(v),
+            Value::Bool(v) => ValueTrait::clone(v),
+            Value::Generic(v) => Value::Generic(Rc::clone(v))  
+        }
+    }
+    
+    
 }
+
 
 
 impl ValueTrait for Value  {
@@ -61,16 +72,28 @@ impl ValueTrait for Value  {
             Value::Nil => ValueTrait::to_string(&Nil::new()),
             Value::Number(v) => ValueTrait::to_string(v),
             Value::Bool(v) => ValueTrait::to_string(v),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.to_string(),            
         }
     }
+
+    
+    fn clone(&self)-> Value {
+        match self {
+            Value::Nil => Value::Nil,
+            Value::Number(v) => ValueTrait::clone(v),
+            Value::Bool(v) => ValueTrait::clone(v),
+            Value::Generic(v) => unimplemented!()  
+        }
+    }
+    
+
 
     fn not(&self)->Result<Value,String>{
         match self {
             Value::Nil => Nil::new().not(),
             Value::Number(v) => v.not(),
             Value::Bool(v) => v.not(),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.not(),            
         }
     }
 
@@ -79,7 +102,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().negate(),
             Value::Number(v) => v.negate(),
             Value::Bool(v) => v.negate(),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.negate(),            
         }
     }
 
@@ -88,7 +111,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().add(other),
             Value::Number(v) => v.add(other),
             Value::Bool(v) => v.add(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.add(other),            
         }
     }
 
@@ -97,7 +120,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().subtract(other),
             Value::Number(v) => v.subtract(other),
             Value::Bool(v) => v.subtract(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.subtract(other),            
         }
     }
 
@@ -106,7 +129,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().multiply(other),
             Value::Number(v) => v.multiply(other),
             Value::Bool(v) => v.multiply(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.multiply(other),            
         }
     }
 
@@ -115,7 +138,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().divide(other),
             Value::Number(v) => v.divide(other),
             Value::Bool(v) => v.divide(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.divide(other),            
         }
     }
 
@@ -124,7 +147,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().compare_equal(other),
             Value::Number(v) => v.compare_equal(other),
             Value::Bool(v) => v.compare_equal(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.compare_equal(other),            
         }
     }
 
@@ -133,7 +156,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().compare_not_equal(other),
             Value::Number(v) => v.compare_not_equal(other),
             Value::Bool(v) => v.compare_not_equal(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.compare_not_equal(other),            
         }
     }
 
@@ -142,7 +165,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().greater(other),
             Value::Number(v) => v.greater(other),
             Value::Bool(v) => v.greater(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.greater(other),            
         }
     }
 
@@ -151,7 +174,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().less(other),
             Value::Number(v) => v.less(other),
             Value::Bool(v) => v.less(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.less(other),            
         }
     }
 
@@ -160,7 +183,7 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().greater_equal(other),
             Value::Number(v) => v.greater_equal(other),
             Value::Bool(v) => v.greater_equal(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.greater_equal(other),            
         }        
     }
 
@@ -169,26 +192,9 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().less_equal(other),
             Value::Number(v) => v.less_equal(other),
             Value::Bool(v) => v.less_equal(other),
-            //Value::Generic(v) => v.to_string(),            
+            Value::Generic(v) => v.less_equal(other),            
         }              
     }
 }
 
 
-/*
-impl Clone for Value{
-    fn clone(&self)->Self{
-        match self {
-            Value::Bool(_) => *self,
-            Value::Nil => Value::Nil,
-            Value::Number(_)=>*self,
-            /*
-            Value::Generic(v)=>{
-                let v2 = v.clone_heap();
-                Value::Generic(v2)
-            }
-            */
-        }
-    }
-}
-*/

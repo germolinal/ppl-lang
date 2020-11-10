@@ -2,7 +2,6 @@ use crate::chunk::*;
 use crate::operations::*;
 use crate::values::*;
 use crate::variable::Var;
-use crate::stack::Stack;
 use crate::value_trait::ValueTrait;
 
 #[cfg(debug_assertions)]
@@ -24,8 +23,8 @@ impl InterpretResult {
 }
 
 pub struct VM {
-    stack: Stack<Value>,
-    var_stack: Stack<Var>,
+    stack: Vec<Value>,
+    var_stack: Vec<Var>,
 }
 
 
@@ -34,9 +33,10 @@ impl VM {
     pub fn new()-> Self{
                     
         Self{
-            var_stack: Stack::new(Var::new()),//Vec::with_capacity(256), 
-            stack: Stack::new(Value::Nil),//Vec::with_capacity(256),            
+            var_stack: Vec::with_capacity(1024),
+            stack: Vec::with_capacity(1024),
         }
+
     }    
 
     pub fn interpret(&mut self, _source : &Vec<u8>) -> InterpretResult {
@@ -58,8 +58,7 @@ impl VM {
                 // report stack
                 print!("  --> Stack: [");
                                             
-                for i in 0..self.stack.len() {
-                    let val = self.stack[i];
+                for val in self.stack.iter() {                    
                     print!("{}, ", val.to_string());                    
                 }
                 print!("]\n");
@@ -73,7 +72,6 @@ impl VM {
                         
             match op {
                 Operation::Return =>{   
-
                     return InterpretResult::Ok;
                 },
                 /*
@@ -89,7 +87,9 @@ impl VM {
                     self.push(Value::Number(*v))
                 },
                 Operation::PushVar(v)=>{
-                    self.push_var(*v);
+                    // This does not move objects... it 
+                    // clones the reference to them
+                    self.push_var(v.copy());
                 },
                 Operation::PopVars(n)=>{                    
                     for _ in 0..*n {
@@ -97,7 +97,7 @@ impl VM {
                     }
                 },
                 Operation::DefineVar(n)=>{
-                    let v = self.pop();                    
+                    let v = self.pop();                                        
                     self.var_stack[*n].value = v;
                     self.var_stack[*n].initialized = true;
                 },
@@ -256,12 +256,7 @@ mod tests {
         let mut vm = VM::new();
         
         assert_eq!(vm.stack.len(),0);
-        match vm.stack[0]{
-            Value::Nil => {},
-            _ => {assert!(false)}
-        }
-        
-        
+                
         vm.push(Value::Number(1.2));
         assert_eq!(vm.stack.len(),1);
 

@@ -12,6 +12,12 @@ impl ValueTrait for Boolean {
     fn type_name(&self)->String{
         format!("Boolean")
     }
+
+    
+
+    fn clone(&self)->Value{
+        Value::Bool(*self)
+    }
     
     fn not(&self)->Result<Value,String>{
         Ok(Value::Bool(!self))
