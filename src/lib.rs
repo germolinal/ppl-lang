@@ -2,11 +2,12 @@
 mod values;
 mod value_trait;
 
+mod nil;
 mod number;
 mod boolean;
-mod nil;
 mod object;
 mod array;
+mod string;
 
 mod variable;
 

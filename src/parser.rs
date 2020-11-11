@@ -200,7 +200,15 @@ impl <'a>Parser<'a>{
                     precedence: Precedence::None,
                     next_precedence: Some(Precedence::Assignment),
                 }
-            }
+            },            
+            TokenType::TokenString => {
+                ParseRule{
+                    prefix: Some(string),
+                    infix: None,
+                    precedence: Precedence::None,
+                    next_precedence: Some(Precedence::Assignment),
+                }
+            },
             TokenType::Minus => {
                 ParseRule{
                     precedence: Precedence::Term,

@@ -22,8 +22,8 @@ impl ValueTrait for Nil {
 
     
 
-    fn clone(&self)->Value{
-        Value::Nil
+    fn clone_to_value(&self)->Value{
+        Value::Nil        
     }
 
 }

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
 
-type Object = HashMap<String,Value>;
+pub type Object = HashMap<String,Value>;
 
 
 
@@ -18,11 +18,11 @@ impl ValueTrait for Object {
         format!("Object")
     }
 
-    fn clone(&self)->Value {
+    fn clone_to_value(&self)->Value {
         let mut ret : Object = HashMap::new();
         
         for (k,v) in self.iter(){
-            ret.insert(k.clone(),ValueTrait::clone(v));
+            ret.insert(Clone::clone(k),ValueTrait::clone_to_value(v));
         }
 
         Value::Generic(Rc::new(ret))

@@ -15,7 +15,7 @@ impl ValueTrait for Boolean {
 
     
 
-    fn clone(&self)->Value{
+    fn clone_to_value(&self)->Value{
         Value::Bool(*self)
     }
     

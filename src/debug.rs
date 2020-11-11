@@ -89,6 +89,9 @@ pub mod debug {
             Operation::PushNumber(v)=>{
                 return println!("OP_PUSH_NUMBER | '{}'", v);         
             },
+            Operation::PushString(v)=>{
+                return println!("OP_PUSH_String | '\"{}'\"", v);         
+            },
 
             Operation::PushVar(_)=>{
                 return println!("OP_PUSH_VAR");

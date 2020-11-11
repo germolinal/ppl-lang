@@ -16,7 +16,7 @@ impl ValueTrait for Number {
         return format!("Number")
     }
 
-    fn clone(&self)->Value{
+    fn clone_to_value(&self)->Value{
         Value::Number(*self)
     }
 
@@ -25,7 +25,7 @@ impl ValueTrait for Number {
         Ok(Value::Number(-self))
     }
 
-    fn add(&self, other: Value)->Result<Value,String>{
+    fn add(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
                 Ok(Value::Number(self + v))
@@ -34,7 +34,7 @@ impl ValueTrait for Number {
         }        
     }
 
-    fn subtract(&self, other: Value)->Result<Value,String>{
+    fn subtract(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
                 Ok(Value::Number(self - v))
@@ -43,7 +43,7 @@ impl ValueTrait for Number {
         }
     }
 
-    fn multiply(&self, other: Value)->Result<Value,String>{
+    fn multiply(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
                 Ok(Value::Number(self * v))
@@ -52,7 +52,7 @@ impl ValueTrait for Number {
         }
     }
 
-    fn divide(&self, other: Value)->Result<Value,String>{
+    fn divide(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
                 Ok(Value::Number(self /v ))
@@ -61,46 +61,46 @@ impl ValueTrait for Number {
         }
     }
 
-    fn compare_equal(&self, other: Value)->Result<Value,String>{
+    fn compare_equal(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
-                Ok(Value::Bool(*self == v))                
+                Ok(Value::Bool(self == v))                
             },
             _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }
     }
 
-    fn greater(&self, other: Value)->Result<Value,String>{
+    fn greater(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
-                Ok(Value::Bool(*self > v))                
+                Ok(Value::Bool(self > v))                
             },
             _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }
     }
 
-    fn less(&self, other: Value)->Result<Value,String>{
+    fn less(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
-                Ok(Value::Bool(*self < v))                
+                Ok(Value::Bool(self < v))                
             },
             _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }
     }
 
-    fn greater_equal(&self, other: Value)->Result<Value,String>{
+    fn greater_equal(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
-                Ok(Value::Bool(*self >= v))                
+                Ok(Value::Bool(self >= v))                
             },
             _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }
     }
 
-    fn less_equal(&self, other: Value)->Result<Value,String>{
+    fn less_equal(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
-                Ok(Value::Bool(*self <= v))                
+                Ok(Value::Bool(self <= v))                
             },
             _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }

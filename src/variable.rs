@@ -21,7 +21,7 @@ impl Var {
         Var{
             typed: self.typed,
             initialized: self.initialized,
-            value: self.value.copy()
+            value: self.value.copy_to_value()
         }
     }
 
@@ -29,7 +29,7 @@ impl Var {
         Var{
             typed: self.typed,
             initialized: self.initialized,
-            value: self.value.clone()
+            value: self.value.clone_to_value()
         }
     }
 }

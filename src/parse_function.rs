@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::parser::*;
 use crate::token::*;
 use crate::operations::*;
@@ -28,6 +30,10 @@ pub fn unary(parser: &mut Parser){
     };
 }
 
+pub fn string(parser: &mut Parser){
+    let v = parser.previous().source_text(parser.source());                
+    parser.emit_byte(Operation::PushString(Rc::new(v)));
+}
 
 pub fn number(parser: &mut Parser){
     let v = parser.previous().source_text(parser.source());            
@@ -37,8 +43,7 @@ pub fn number(parser: &mut Parser){
             return parser.error_at_current(msg.to_string());
         }
     };    
-    parser.emit_byte(Operation::PushNumber(the_v));
-    
+    parser.emit_byte(Operation::PushNumber(the_v));   
 }
 
 pub fn grouping(parser: &mut Parser){

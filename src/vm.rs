@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::chunk::*;
 use crate::operations::*;
 use crate::values::*;
@@ -51,7 +53,7 @@ impl VM {
         for (_offset,op) in chunk.code().iter().enumerate(){
 
             /*****************************/
-            /* Dissassemble when testing */
+            /* Dissassemble when developing */
             /*****************************/
             #[cfg(debug_assertions)]
             {
@@ -85,6 +87,9 @@ impl VM {
                 },                
                 Operation::PushNumber(v)=>{
                     self.push(Value::Number(*v))
+                },                
+                Operation::PushString(v)=>{
+                    self.push(Value::StringV( Rc::clone(v)) )
                 },
                 Operation::PushVar(v)=>{
                     // This does not move objects... it 
@@ -120,7 +125,7 @@ impl VM {
                 Operation::Add => {    
                     let b = self.pop();
                     let a = self.pop();
-                    match a.add(b){
+                    match a.add(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }  
@@ -128,7 +133,7 @@ impl VM {
                 Operation::Subtract => {    
                     let b = self.pop();
                     let a = self.pop();
-                    match a.subtract(b){
+                    match a.subtract(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }               
@@ -136,7 +141,7 @@ impl VM {
                 Operation::Multiply => {    
                     let b = self.pop();
                     let a = self.pop();
-                    match a.multiply(b){
+                    match a.multiply(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }           
@@ -144,7 +149,7 @@ impl VM {
                 Operation::Divide => {    
                     let b = self.pop();
                     let a = self.pop();
-                    match a.divide(b){
+                    match a.divide(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }       
@@ -152,7 +157,7 @@ impl VM {
                 Operation::Equal => {
                     let b = self.pop();
                     let a = self.pop();
-                    match a.compare_equal(b){
+                    match a.compare_equal(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }       
@@ -162,7 +167,7 @@ impl VM {
                 Operation::NotEqual => {
                     let b = self.pop();
                     let a = self.pop();
-                    match a.compare_not_equal(b){
+                    match a.compare_not_equal(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }       
@@ -171,7 +176,7 @@ impl VM {
                 Operation::Greater => {
                     let b = self.pop();
                     let a = self.pop();
-                    match a.greater(b){
+                    match a.greater(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }   
@@ -179,7 +184,7 @@ impl VM {
                 Operation::Less => {
                     let b = self.pop();
                     let a = self.pop();
-                    match a.less(b){
+                    match a.less(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }                       
@@ -187,7 +192,7 @@ impl VM {
                 Operation::GreaterEqual => {
                     let b = self.pop();
                     let a = self.pop();
-                    match a.greater_equal(b){
+                    match a.greater_equal(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }   
@@ -195,7 +200,7 @@ impl VM {
                 Operation::LessEqual => {
                     let b = self.pop();
                     let a = self.pop();
-                    match a.less_equal(b){
+                    match a.less_equal(&b){
                         Ok(v)=>self.push(v),
                         Err(e)=>return InterpretResult::RuntimeError(e)
                     }   

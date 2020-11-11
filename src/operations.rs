@@ -1,5 +1,5 @@
-//use crate::variable::*;
 use crate::variable::Var;
+use std::rc::Rc;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
@@ -20,6 +20,7 @@ pub enum Operation {
     //Constant(usize),
     PushBool(bool),
     PushNumber(f64),  
+    PushString(Rc<String>),
     PopVars(usize),
     DefineVar(usize),
     PushVar(Var),
