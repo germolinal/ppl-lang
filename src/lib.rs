@@ -8,6 +8,9 @@ mod boolean;
 mod object;
 mod array;
 mod string;
+mod function;
+mod rust_fn;
+mod script_fn;
 
 mod variable;
 

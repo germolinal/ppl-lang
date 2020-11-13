@@ -5,6 +5,7 @@ use crate::operations::*;
 
 /// Represents a set of operations and values
 
+
 pub struct Chunk {
 
     /// The sequential instructions to carry out
@@ -15,6 +16,23 @@ pub struct Chunk {
 
     /// The lines at which each instruction was created
     lines : Vec<usize>,
+}
+
+impl Clone for Chunk {
+    fn clone(&self) -> Self{
+        let mut code : Vec<Operation> = Vec::with_capacity(self.code.len());
+        let mut lines : Vec<usize> = Vec::with_capacity(self.lines.len());
+
+        for i in 0..code.len(){
+            code.push(self.code[i].clone());
+            lines.push(self.lines[i]);
+        }
+
+        Self{
+            code: code,
+            lines: lines,
+        }
+    }
 }
 
 impl Chunk { 
@@ -33,6 +51,10 @@ impl Chunk {
         &self.code
     }
 
+    pub fn patch_code(&mut self, i: usize, op: Operation){
+        self.code[i]=op;
+    }
+
     /*
     pub fn constants(&self)->&Vec<dyn ValueTrait>{
         &self.constants
@@ -42,6 +64,20 @@ impl Chunk {
     
     pub fn lines(&self)->&Vec<usize>{
         &self.lines
+    }
+
+    pub fn to_slices(&self)->(&[Operation],&[usize]){
+        let code : &[Operation] = &self.code;
+        let lines : &[usize] = &self.lines;
+        
+        (code,lines)
+    }
+
+    pub fn get_sub_slices(&self, ini: usize, fin: usize)->(&[Operation],&[usize]){
+        let code : &[Operation] = &self.code[ini..fin];
+        let lines : &[usize] = &self.lines[ini..fin];
+        
+        (code,lines)
     }
 
     

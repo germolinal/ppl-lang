@@ -3,10 +3,11 @@ use std::rc::Rc;
 use crate::parser::*;
 use crate::token::*;
 use crate::operations::*;
-
-
+use crate::script_fn::ScriptFn;
+use crate::function::Function;
 
 /* PARSING FUNCTIONS */
+
 
 pub fn unary(parser: &mut Parser){
         
@@ -35,6 +36,28 @@ pub fn string(parser: &mut Parser){
     parser.emit_byte(Operation::PushString(Rc::new(v)));
 }
 
+pub fn array(parser: &mut Parser){
+    
+    //parser.advance();
+
+    let mut n : usize = 0;
+    
+    while !parser.consume(TokenType::RightBracket){        
+        parser.expression();        
+        n +=1;
+        
+        if !parser.consume(TokenType::Comma) && !parser.check(TokenType::RightBracket) {
+            parser.error_at_current(format!("Expecting ',' between Array elements."));
+        }
+
+        if parser.check(TokenType::EOF){
+            parser.error_at_current(format!("Expecting ']' at the end of Array"));
+        }
+    }
+        
+    parser.emit_byte(Operation::PushArray(n));
+}
+
 pub fn number(parser: &mut Parser){
     let v = parser.previous().source_text(parser.source());            
     let the_v = match v.parse::<f64>(){
@@ -44,6 +67,16 @@ pub fn number(parser: &mut Parser){
         }
     };    
     parser.emit_byte(Operation::PushNumber(the_v));   
+}
+
+
+
+pub fn index(_parser: &mut Parser){
+    unimplemented!();
+}
+
+pub fn call(_parser:&mut Parser){
+    unimplemented!();
 }
 
 pub fn grouping(parser: &mut Parser){
@@ -111,3 +144,68 @@ pub fn literal(parser: &mut Parser){
         _ => parser.internal_error_at_current(format!("Unknown Token in literal()")) 
     }
 }
+
+pub fn function(parser:&mut Parser)->Option<Rc<ScriptFn>>{
+    // starts from the (), so it covers
+    // both fn(){} and fn ID(){}
+    // this becomes { let args[]; { ...body... }}
+    parser.show_tokens("function()");
+    if !parser.consume(TokenType::LeftParen){
+        parser.error_at_current(format!("Expecting '(' when defining function"));        
+        return None;
+    }
+
+    // Get a copy of the current function
+    let old_func = Rc::clone(parser.current_function());
+
+    // Create a new unnamed function, and plug it to the 
+    // parser
+    let new_func = Rc::new(ScriptFn::new("".to_string()));
+    parser.set_function(new_func); 
+
+    // Open main scope
+    parser.begin_scope();
+
+    let mut n_vars : usize = 0;
+    parser.var_declaration(&mut n_vars);
+    if !parser.consume(TokenType::RightParen){
+        parser.error_at_current(format!("Expecting ')' after variable list in function declaration"));        
+        return None;
+    }
+
+    // Now the body of the function
+    if !parser.consume(TokenType::LeftBrace){
+        parser.error_at_current(format!("Expecting '{{' for opening body of function"));        
+        return None;
+    }
+    // Open, process, and close body
+    parser.begin_scope();
+    parser.block();
+    parser.end_scope();
+
+    // Close main scope
+    parser.end_scope();
+
+    parser.show_tokens("function()  2");
+
+    // Get the created function back.
+    let new_func = Rc::clone(parser.current_function());
+    
+    // Restore the old one
+    parser.set_function(old_func);
+
+    return Some(new_func);
+}
+
+pub fn function_value(parser:&mut Parser){
+    match function(parser){
+        Some(f)=>{
+            // f is now the function.
+            let v = Function::Script(f);
+            parser.emit_byte(Operation::PushFunction(v))
+        },
+        None => {}
+    }
+}
+
+

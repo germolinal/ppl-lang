@@ -1,6 +1,6 @@
 #[cfg(debug_assertions)]
 pub mod debug {
-    use crate::chunk::*;
+    use crate::chunk::Chunk;
     use crate::operations::*;
     use crate::token::*;
     
@@ -25,15 +25,16 @@ pub mod debug {
     /// Disassembles an Operation
     /// # Arguments:
     /// * op: The operation to be unassembled
-    pub fn operation(chunk: &Chunk, offset: usize) {        
-        let ops = chunk.code();
+    pub fn operation(ops: &[Operation], lines: &[usize],offset: usize) {        
+        //let ops = chunk.code();
         let op = &ops[offset];
-        let ln = chunk.lines()[offset];
+        let ln = lines[offset];
+        //let ln = chunk.lines()[offset];
         print!("{:04} ", offset);    
         
         if ln > 0 {
             print!("(ln {})\t", ln)
-        }else{
+        }else {
             print!("\t/\t")
         }
         
@@ -90,8 +91,21 @@ pub mod debug {
                 return println!("OP_PUSH_NUMBER | '{}'", v);         
             },
             Operation::PushString(v)=>{
-                return println!("OP_PUSH_String | '\"{}'\"", v);         
+                return println!("OP_PUSH_STRING | '\"{}'\"", v);         
             },
+            Operation::PushArray(v)=>{
+                return println!("OP_PUSH_ARRAY | '\"{} elements'\"", v);         
+            },
+            Operation::PushObject(_)=>{
+                return println!("OP_PUSH_OBJECT");         
+            },
+            Operation::PushGeneric(v)=>{
+                return println!("OP_PUSH_GENERIC | '{}'", v.type_name());         
+            },
+            Operation::PushFunction(v)=>{
+                return println!("OP_PUSH_FUNCTION | '{}()'", v.get_name());
+            }
+
 
             Operation::PushVar(_)=>{
                 return println!("OP_PUSH_VAR");
@@ -124,6 +138,22 @@ pub mod debug {
                 return simple_instruction("OP_LESS_EQUAL", offset );
             },
 
+            Operation::ForLoop(n_vars,body_length)=>{
+                return println!("OP_FOR_LOOP | {} vars, length: {}",n_vars, body_length); 
+            },
+
+            Operation::JumpIfFalse(n)=>{
+                return println!("OP_JUMP_IF_FALSE | {} ops",n); 
+            },
+
+            Operation::JumpIfTrue(n)=>{
+                return println!("OP_JUMP_IF_TRUE | {} ops",n); 
+            },
+
+            Operation::JumpBack(n)=>{
+                return println!("OP_JUMP_BACK | {} ops",n); 
+            }
+
         }
         
     }
@@ -136,8 +166,11 @@ pub mod debug {
         
         println!("== {} ==\n", name);
     
-        for (i,_) in chunk.code().iter().enumerate(){
-            operation(chunk,i);
+        let lines : &[usize]= &chunk.lines();
+        let ops : &[Operation]= &chunk.code();
+
+        for i in 0..ops.len(){
+            operation(ops, lines, i);
         }
     }
 
@@ -149,11 +182,13 @@ pub mod debug {
             
             TokenType::LeftParen => "LEFT_PAREN", TokenType::RightParen => "RIGHT_PAREN",
             TokenType::LeftBrace => "LEFT_BRACE", TokenType::RightBrace => "RIGHT_BRACE",
+            TokenType::LeftBracket => "LEFT_BRACKET", TokenType::RightBracket => "RIGHT_BRACKET",
     
             TokenType::Comma => "COMMA", TokenType::Dot => "DOT",
             TokenType::Minus => "MINUS", TokenType::Plus => "PLUS",  
-            TokenType::Colon=>{"COLON"}, TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
+            TokenType::Colon=>"COLON", TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
             /*TokenType::Semicolon => "SEMICOLON",*/
+            TokenType::Question => "QUESTION",
 
             TokenType::Bang => "BANG!", TokenType::BangEqual => "BANG! EQUAL",
             TokenType::Equal => "EQUAL", TokenType::EqualEqual => "EQUAL EQUAL",

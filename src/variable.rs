@@ -23,9 +23,11 @@ impl Var {
             initialized: self.initialized,
             value: self.value.copy_to_value()
         }
-    }
+    }    
+}
 
-    pub fn clone(&self)->Self{
+impl Clone for Var {
+    fn clone(&self)->Self{
         Var{
             typed: self.typed,
             initialized: self.initialized,

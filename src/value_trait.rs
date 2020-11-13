@@ -1,5 +1,6 @@
 use crate::values::Value;
 
+
 pub trait ValueTrait {
     // Basic i/o
     fn to_string(&self)->String;
@@ -8,6 +9,11 @@ pub trait ValueTrait {
 
     // Copy and clone
     fn clone_to_value(&self)->Value;
+
+    // Loops.
+    fn get_value(&self, _i: usize)->Result<(Value,Value),String>{
+        Err(format!("Cannot iterate type '{}'", self.type_name()))
+    }
 
     // Operators
     fn not(&self)->Result<Value,String>{

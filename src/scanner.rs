@@ -391,6 +391,8 @@ impl <'a>Scanner<'a> {
             ')' => Token::new(self, TokenType::RightParen),
             '{' => Token::new(self, TokenType::LeftBrace),
             '}' => Token::new(self, TokenType::RightBrace),
+            '[' => Token::new(self, TokenType::LeftBracket),
+            ']' => Token::new(self, TokenType::RightBracket),
             ',' => Token::new(self, TokenType::Comma),
             '.' => Token::new(self, TokenType::Dot),
             '-' => Token::new(self, TokenType::Minus),
@@ -398,6 +400,7 @@ impl <'a>Scanner<'a> {
             //';' => Token::new(self, TokenType::Semicolon),
             '/' => Token::new(self, TokenType::Slash),
             '*' => Token::new(self, TokenType::Star),
+            '?' => Token::new(self,TokenType::Question),
             
             // Single or Double char
             '!' => {  

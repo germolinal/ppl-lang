@@ -6,6 +6,7 @@ use crate::value_trait::ValueTrait;
 use crate::nil::Nil;
 use crate::number::Number;
 use crate::boolean::Boolean;
+use crate::function::Function;
 use crate::array::Array;
 use crate::object::Object;
 use crate::string::StringV;
@@ -20,15 +21,17 @@ pub enum Value {
 
     Number(Number),
     Bool(Boolean),
-
+    Function(Function),
+    
     /* Heap allocated variables */
-
     StringV(Rc<StringV>),
     Array(Rc<Array>),
     Object(Rc<Object>),
+
     
-    /// Generic object, for classes defined within
-    /// the script. 
+    
+    /// Generic object, for extending
+    /// this language
     Generic(Rc<dyn ValueTrait>),
 }
 
@@ -70,6 +73,13 @@ impl Value {
         }
     }
 
+    pub fn get_function(&self)->Option<Function>{
+        match self{
+            Value::Function(v)=>Some(v.clone()),
+            _ => None
+        }
+    }
+
     
     pub fn get_generic(&self)->Option<&Rc<dyn ValueTrait>>{
         match self {
@@ -79,7 +89,7 @@ impl Value {
     }
     
 
-    pub fn is_nil(&self)->bool{
+    pub fn is_nil(&self)-> bool {
         match self {
             Value::Nil => true,
             _ => false
@@ -93,6 +103,7 @@ impl Value {
             Value::Nil=>ValueTrait::clone_to_value(&Nil),
             Value::Number(v)=>ValueTrait::clone_to_value(v),
             Value::Bool(v)=>ValueTrait::clone_to_value(v),
+            Value::Function(v)=>Value::Function(v.clone()),
             Value::StringV(v)=>{
                 // We clone the String.                
                 v.clone_to_value()
@@ -114,13 +125,14 @@ impl Value {
 
 
 
-impl  ValueTrait for Value  {
+impl ValueTrait for Value  {
 
     fn type_name(&self)->String{        
         format!("Value({})",match self {
             Value::Nil=>Nil.type_name(),
             Value::Number(v)=>v.type_name(),
             Value::Bool(v)=>v.type_name(),
+            Value::Function(v)=>v.type_name(),
             Value::Array(v)=>v.type_name(),
             Value::StringV(v)=>v.type_name(),
             Value::Object(v)=>v.type_name(),
@@ -133,6 +145,7 @@ impl  ValueTrait for Value  {
             Value::Nil => ValueTrait::to_string(&Nil::new()),
             Value::Number(v) => ValueTrait::to_string(v),
             Value::Bool(v) => ValueTrait::to_string(v),
+            Value::Function(v)=>v.to_string(),
             Value::Array(v)=> v.to_string(),
             Value::StringV(v)=> v.to_string(),
             Value::Object(v)=> v.to_string(),
@@ -146,6 +159,8 @@ impl  ValueTrait for Value  {
             Value::Nil=>ValueTrait::clone_to_value(&Nil),
             Value::Number(v)=>ValueTrait::clone_to_value(v),
             Value::Bool(v)=>ValueTrait::clone_to_value(v),
+            // functions are cloned by reference
+            Value::Function(v)=>Value::Function(v.clone()),
             Value::Array(v)=> {                
                 v.clone_to_value()
             },
@@ -168,6 +183,7 @@ impl  ValueTrait for Value  {
             Value::Nil=>Nil.not(),
             Value::Number(v)=>v.not(),
             Value::Bool(v)=>v.not(),
+            Value::Function(v)=>v.not(),
             Value::Array(v)=>v.not(),
             Value::StringV(v)=>v.not(),
             Value::Object(v)=>v.not(),
@@ -180,6 +196,7 @@ impl  ValueTrait for Value  {
             Value::Nil=>Nil.negate(),
             Value::Number(v)=>v.negate(),
             Value::Bool(v)=>v.negate(),
+            Value::Function(v)=>v.negate(),
             Value::Array(v)=>v.negate(),
             Value::StringV(v)=>v.negate(),
             Value::Object(v)=>v.negate(),
@@ -192,6 +209,7 @@ impl  ValueTrait for Value  {
             Value::Nil=>Nil.add(other),
             Value::Number(v)=>v.add(other),
             Value::Bool(v)=>v.add(other),
+            Value::Function(v)=>v.add(other),
             Value::Array(v)=>v.add(other),
             Value::StringV(v)=>v.add(other),
             Value::Object(v)=>v.add(other),
@@ -204,6 +222,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().subtract(other),
             Value::Number(v) => v.subtract(other),
             Value::Bool(v) => v.subtract(other),
+            Value::Function(v)=>v.subtract(other),
             Value::Array(v)=>v.subtract(other),
             Value::StringV(v)=>v.subtract(other),
             Value::Object(v)=>v.subtract(other),
@@ -216,6 +235,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().multiply(other),
             Value::Number(v) => v.multiply(other),
             Value::Bool(v) => v.multiply(other),
+            Value::Function(v)=>v.multiply(other),
             Value::Array(v)=>v.multiply(other),
             Value::StringV(v)=>v.multiply(other),
             Value::Object(v)=>v.multiply(other),
@@ -228,6 +248,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().divide(other),
             Value::Number(v) => v.divide(other),
             Value::Bool(v) => v.divide(other),
+            Value::Function(v)=>v.divide(other),
             Value::Array(v)=>v.divide(other),
             Value::StringV(v)=>v.divide(other),
             Value::Object(v)=>v.divide(other),
@@ -240,6 +261,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().compare_equal(other),
             Value::Number(v) => v.compare_equal(other),
             Value::Bool(v) => v.compare_equal(other),
+            Value::Function(v)=>v.compare_equal(other),
             Value::Array(v)=>v.compare_equal(other),
             Value::StringV(v)=>v.compare_equal(other),
             Value::Object(v)=>v.compare_equal(other),
@@ -252,6 +274,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().compare_not_equal(other),
             Value::Number(v) => v.compare_not_equal(other),
             Value::Bool(v) => v.compare_not_equal(other),
+            Value::Function(v)=>v.compare_not_equal(other),
             Value::Array(v)=>v.compare_not_equal(other),
             Value::StringV(v)=>v.compare_not_equal(other),
             Value::Object(v)=>v.compare_not_equal(other),
@@ -264,6 +287,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().greater(other),
             Value::Number(v) => v.greater(other),
             Value::Bool(v) => v.greater(other),
+            Value::Function(v)=>v.greater(other),
             Value::Array(v)=>v.greater(other),
             Value::StringV(v)=>v.greater(other),
             Value::Object(v)=>v.greater(other),
@@ -276,6 +300,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().less(other),
             Value::Number(v) => v.less(other),
             Value::Bool(v) => v.less(other),
+            Value::Function(v)=>v.less(other),
             Value::Array(v)=>v.less(other),
             Value::StringV(v)=>v.less(other),
             Value::Object(v)=>v.less(other),
@@ -288,6 +313,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().greater_equal(other),
             Value::Number(v) => v.greater_equal(other),
             Value::Bool(v) => v.greater_equal(other),
+            Value::Function(v)=>v.greater_equal(other),
             Value::Array(v)=>v.greater_equal(other),
             Value::StringV(v)=>v.greater_equal(other),
             Value::Object(v)=>v.greater_equal(other),
@@ -300,6 +326,7 @@ impl  ValueTrait for Value  {
             Value::Nil => Nil::new().less_equal(other),
             Value::Number(v) => v.less_equal(other),
             Value::Bool(v) => v.less_equal(other),
+            Value::Function(v)=>v.less_equal(other),
             Value::Array(v)=>v.less_equal(other),
             Value::StringV(v)=>v.less_equal(other),
             Value::Object(v)=>v.less_equal(other),

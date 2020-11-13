@@ -23,4 +23,12 @@ impl ValueTrait for Boolean {
         Ok(Value::Bool(!self))
     }
 
+    fn compare_equal(&self,other: &Value)->Result<Value,String>{
+        if let Value::Bool(b) = other{
+            Ok(Value::Bool(b == self))
+        }else{
+            Err(format!("Trying to compare Bool with {}",other.type_name()))
+        }
+    }
+
 }

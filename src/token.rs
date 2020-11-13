@@ -9,8 +9,10 @@ pub enum TokenType{
     // Single character
     LeftParen, RightParen,
     LeftBrace, RightBrace,
+    LeftBracket, RightBracket,
     Comma, Dot, Minus, Plus,
     Colon, Slash, Star, //Semicolon,
+    Question,
 
     // One or two characters
     Bang, BangEqual,
