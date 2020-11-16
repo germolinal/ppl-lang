@@ -1,11 +1,10 @@
-use std::ops::{Deref, DerefMut};
 use crate::chunk::Chunk;
 
 
 pub struct ScriptFn {
     pub name: String,
     chunk: Chunk,
-    n_args: usize,
+    pub n_args: usize,
     //n_outs: usize,
 }
 
@@ -13,9 +12,9 @@ pub struct ScriptFn {
 impl ScriptFn {
 
     
-    pub fn new(name: String)->Self{
+    pub fn new(name: &String)->Self{
         Self {
-            name: name,
+            name: name.clone(),
             chunk: Chunk::new(),
             n_args: 0
         }
@@ -29,34 +28,14 @@ impl ScriptFn {
     pub fn mut_chunk(&mut self)->&mut Chunk{
         &mut self.chunk
     }
-
+    
     pub fn set_name(&mut self,name:&String){        
         self.name = name.clone();
+    }
+
+    pub fn set_n_args(&mut self, n_args: usize){
+        self.n_args = n_args
     }
         
 }
 
-
-/*
-use std::rc::Rc;
-impl Deref for ScriptFn{
-    
-    type Target = Chunk;
-    
-    fn deref(&self)->&Self::Target{
-        &self.chunk
-    }
-}
-
-
-
-impl DerefMut for ScriptFn{
-    
-    //type Target = ScriptFn;
-    
-    fn deref_mut(&mut self)->&mut Self::Target{
-        &mut self.chunk
-    }
-}
-
-*/

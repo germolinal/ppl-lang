@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
@@ -25,6 +24,6 @@ impl ValueTrait for Array {
             ret.push(v.clone_to_value());
         }
 
-        Value::Array(Rc::new(ret))
+        Value::Array(Box::new(ret))
     }
 }

@@ -1,12 +1,11 @@
+use crate::handler::Handler;
+
+pub type RustFnType = fn(&mut Handler, usize)->usize;
 
 
-use crate::chunk::Chunk;
-
-pub struct RustFn {
-    pub name: String,
-    chunk: Chunk,
-    n_args: usize,
-    //n_outs: usize,
+pub struct RustFn {    
+    pub func : RustFnType,    
+    pub name : String,
 }
 
 impl RustFn {

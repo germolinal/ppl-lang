@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::collections::HashMap;
 
 use crate::value_trait::ValueTrait;
@@ -18,14 +17,14 @@ impl ValueTrait for Object {
         format!("Object")
     }
 
-    fn clone_to_value(&self)->Value {
+    fn clone_to_value(&self)-> Value {
         let mut ret : Object = HashMap::new();
         
         for (k,v) in self.iter(){
             ret.insert(Clone::clone(k),ValueTrait::clone_to_value(v));
         }
 
-        Value::Generic(Rc::new(ret))
+        Value::Object(Box::new(ret))
     }
 }
 

@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use crate::rust_fn::RustFn;
 use crate::script_fn::ScriptFn;
@@ -7,15 +6,14 @@ use crate::values::Value;
 //use crate::chunk::Chunk;
 
 
-#[derive(Clone)]
 pub enum Function{
-    Rust(Rc<RustFn>),
-    Script(Rc<ScriptFn>)
+    Rust(Box<RustFn>),
+    Script(Box<ScriptFn>)
 }
 
 impl Function {
 
-    pub fn new_script(name:String)->ScriptFn{
+    pub fn new_script(name: &String)->ScriptFn{
         ScriptFn::new(name)
     }
 

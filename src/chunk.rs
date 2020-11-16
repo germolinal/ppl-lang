@@ -18,6 +18,7 @@ pub struct Chunk {
     lines : Vec<usize>,
 }
 
+/*
 impl Clone for Chunk {
     fn clone(&self) -> Self{
         let mut code : Vec<Operation> = Vec::with_capacity(self.code.len());
@@ -34,6 +35,7 @@ impl Clone for Chunk {
         }
     }
 }
+*/
 
 impl Chunk { 
 

@@ -1,15 +1,16 @@
-use std::rc::Rc;
 
 use crate::debug::*;
 use crate::scanner::*;
-use crate::operations::*;
+//use crate::operations::*;
 use crate::token::*;
 use crate::chunk::*;
 use crate::values::*;
 use crate::parse_function::*;
-use crate::variable::*;
 use crate::function::Function;
 use crate::script_fn::ScriptFn;
+use crate::value_trait::ValueTrait;
+use crate::operations::Operation;
+//use crate::package::Packages;
 
 
 #[repr(u8)] 
@@ -47,17 +48,15 @@ pub struct Parser<'a>{
     scanner: Scanner<'a>,
     //chunk: Chunk,
     
-    variables: Vec<NamedVar>,
+    variables: Vec<String>,
     variable_count: Vec<usize>,
+    constants: Vec<Box<dyn ValueTrait>>,
 
     optimize: bool,
 
     // No need to cover RustFn because it is not scanned.
-    current_function: Rc<ScriptFn>,
-    
-    functions: Vec<Rc<ScriptFn>>,
-
-    //main_function: Rc<ScriptFn>,
+    current_function: Option<Box<ScriptFn>>,        
+    //current_package: &'a mut Package
 
 }
 
@@ -68,7 +67,7 @@ impl <'a>Parser<'a>{
         let previous = Token::new(&scanner,TokenType::EOF);
         let current = Token::new(&scanner,TokenType::EOF);
         
-        let main_function = Rc::new(Function::new_script("main".to_string()));
+        let main_function = Box::new(Function::new_script(&"main".to_string()));
 
         Self{
             scanner: scanner,
@@ -76,40 +75,80 @@ impl <'a>Parser<'a>{
             panic_mode: false,
             current: current,
             previous: previous,
-            //chunk: Chunk::new(),
 
             variables: vec![],
             variable_count: vec![0],
+            constants: Vec::with_capacity(256),
 
             optimize: false,      
-            current_function : Rc::clone(&main_function),      
-            
-            functions: Vec::with_capacity(256),
-            //main_function: main_function,
+            current_function : Some(main_function),                  
         }
     }
 
-    pub fn current_function(&self)->&Rc<ScriptFn>{
-        &self.current_function
+    pub fn take_current_function(&mut self)->Option<Box<ScriptFn>>{
+        self.current_function.take()
     }
 
-    pub fn set_function(&mut self, func : Rc<ScriptFn>){
-        self.current_function = func;
+    /*
+    pub fn current_function(&self)->Result<&Box<ScriptFn>,String>{
+        match self.current_function {
+            Some(v) =>Ok(&v),
+            None => {
+                return Err(format!("Trying to get Parser's current compilation function, but found None"));                
+            }
+        }
+    }
+    */
+    
+
+    pub fn set_function(&mut self, func : Box<ScriptFn>){
+        self.current_function = Some(func);
     }
 
-    pub fn push_function(&mut self, func: Rc<ScriptFn>){
-        self.functions.push(func);
-    }
 
-    pub fn chunk(&self)->&Chunk{
-        self.current_function.chunk()
+    pub fn chunk_len(&mut self)->Option<usize>{
+        match &self.current_function {
+            Some(f)=>Some(f.chunk().code().len()),
+            None => {
+                self.error_no_current_function();
+                None
+            }
+        }
     }
+    
+
+    
+    pub fn chunk(&mut self)->Option<&Chunk> {
+        if self.current_function.is_none(){
+            // We need this to avoid double borrowing.
+            self.error_no_current_function();
+            return None
+        }else{
+            match &self.current_function{
+                Some(f)=>Some(f.chunk()),
+                None=>None
+            }
+        }
+    }
+    
 
     pub fn patch_chunk(&mut self, position: usize, op: Operation){
-        match Rc::get_mut(&mut self.current_function){
-            Some(r)=>r.mut_chunk().patch_code(position,op),
-            None => panic!("Could not get mutable reference to function")
-        }
+        match &mut self.current_function{
+            Some(f)=>{
+                f.mut_chunk().patch_code(position,op)
+            }
+            None => {
+                self.error_no_current_function()                
+            }
+        }        
+    }
+
+    fn push_to_heap(&mut self, v: Box<dyn ValueTrait>)->usize{
+        let i = self.constants.len();
+
+        self.constants.push(v);
+
+        return i;
     }
 
     /* UTILITY FUNCTIONS */
@@ -125,15 +164,10 @@ impl <'a>Parser<'a>{
     }    
 
     fn current_scope_has_variable(&self, var_name: &String)->bool{
-        let n = self.variable_count[self.scope_depth()-1];
-        let fin = self.variables.len();
-        let ini = fin - n;
-        for i in ini..fin{
-            if var_name == &self.variables[i].name {
-                return true
-            }
+        match self.find_var_in_scope(var_name){
+            Some(_)=>true,
+            None => false
         }
-        false
     }
     
     pub fn previous(&self)->Token{
@@ -163,6 +197,45 @@ impl <'a>Parser<'a>{
         false
     }
 
+    fn search_var(&self,var_name: &String, n_vars: usize)->Option<usize>{
+
+        
+        let fin = self.variables.len();
+        let ini = fin - n_vars;
+        for i in (ini..fin).rev(){
+            if &self.variables[i] == var_name{
+                return Some(i)
+            }
+        }
+        None
+    }
+
+    pub fn find_var_in_scope(&self, var_name: &String)->Option<usize>{
+        
+        let n_vars = self.variable_count[self.scope_depth()-1];
+        
+        self.search_var(var_name, n_vars)
+    }
+
+    pub fn find_var(&self, var_name: &String)->Option<usize>{
+        self.search_var(var_name, self.variables.len())        
+    }
+    
+
+    pub fn push_variable(&mut self, name: String, v: Value){
+        // Register variable in the parser
+        self.variables.push(name);
+
+
+        // Register the variable in the VM
+        self.emit_byte(Operation::PushVar(v));
+    
+        // Take note of the variable registration
+        let depth = self.variable_count.len();
+        self.variable_count[depth-1] += 1;
+
+    }
+
     /*
     pub fn consume_previous(&mut self, expected_type: TokenType)->bool{
         if self.previous.token_type() == expected_type {
@@ -188,27 +261,12 @@ impl <'a>Parser<'a>{
     
 
     pub fn emit_byte(&mut self, op: Operation){
-        //self.mut_chunk().write_operation(op, self.previous.line());
-        match Rc::get_mut(&mut self.current_function){
-            Some(r)=> r.mut_chunk().write_operation(op, self.previous.line()),
-            None => panic!("Could not get mutable reference to function")
-        }
-    }
-    /*
-    fn end_compiler(&mut self){
-        self.emit_return();
+        match &mut self.current_function{
+            Some(f)=>f.mut_chunk().write_operation(op, self.previous.line()),
+            None => self.error_no_current_function()                
+        }        
     }
     
-    fn emit_return(&mut self){
-        self.emit_byte(Operation::Return);
-    }
-    */
-
-    /*
-    pub fn add_constant(&mut self,v: Value<'a>)->usize{
-        self.chunk.add_constant(v)
-    }
-    */
 
     pub fn source(&self)->&Vec<u8>{
         self.scanner.source()
@@ -260,7 +318,15 @@ impl <'a>Parser<'a>{
                     precedence: Precedence::None,
                     next_precedence: Some(Precedence::Assignment),
                 }
-            },            
+            },      
+            TokenType::Identifier =>{
+                ParseRule{
+                    prefix: Some(variable),
+                    infix: None,
+                    precedence: Precedence::None,
+                    next_precedence: Some(Precedence::Assignment),
+                }
+            },                        
             TokenType::TokenString => {
                 ParseRule{
                     prefix: Some(string),
@@ -342,11 +408,13 @@ impl <'a>Parser<'a>{
                     prefix: None,
                     infix: Some(binary),
                 }
-            },            
+            }   
             _ => {
                 eprintln!(" ===> {}",debug::token_type(ttype));
                 unimplemented!()
             }
+            /*
+            */
         }
     }
 
@@ -378,7 +446,7 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// program -> declaration* EOF
-    pub fn program(&mut self) -> bool {            
+    pub fn compile(&mut self) -> Option<Box<ScriptFn>> {            
         // Prime the pump
         self.advance();
         //self.advance();
@@ -388,7 +456,23 @@ impl <'a>Parser<'a>{
         }
                 
 
-        return !self.had_error;
+        if self.had_error{
+            #[cfg(debug_assertions)]
+            {
+                match &self.current_function{
+                    Some(f)=>{
+                        let ch = f.chunk();
+                        debug::chunk(ch, format!("main"));
+                    },
+                    None=> println!("No Main Chunk to debug")
+                }
+                
+            }
+            return None;
+        }else{
+            self.emit_byte(Operation::Return);
+            return self.take_current_function();
+        }
     }
 
     /// Compiles a declaration    
@@ -421,7 +505,7 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar
     /// function -> fn IDENTIFIER (varlist) BLOCK
-    fn fn_declaration(&mut self){
+    fn fn_declaration(&mut self ){
         // fn has been consumed.
         let func_name = if self.consume(TokenType::Identifier){
             self.previous.source_text(self.source())
@@ -429,25 +513,22 @@ impl <'a>Parser<'a>{
             return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",self.previous.source_text(self.source()) ))
         };
 
-        let mut func = match function(self){
+        let mut func = match function(self, &func_name){
             Some(f)=>f,
             None => return
         };
 
-        match Rc::get_mut(&mut func){
-            Some(f)=>{
-                f.set_name(&func_name);                
-            },
-            None => panic!("Impossible to rename function")
-        }
-        
-        self.push_function(func);
+        // Push constant.
+        let i = self.push_to_heap(Box::new(Function::Script(func)));
+
+        // Register the function
+        self.push_variable(func_name, Value::HeapRef(i));
     }
 
     /// Compiles a Variable declaration    
     ///     
     /// # EBNF Grammar
-    /// var_declaration -> "let" IDENTIFIER (":" TYPE ) ("=" expression)
+    /// var_declaration -> "let" IDENTIFIER ("=" expression)
     pub fn var_declaration(&mut self, n_declared_vars : &mut usize){        
         self.show_tokens("var_declaration - Start");
         
@@ -470,31 +551,10 @@ impl <'a>Parser<'a>{
         let typed = false;        
         let initialized = false;
 
-        // Check if it has a type                        
-        if self.match_token(TokenType::Colon){//let TokenType::Colon = self.current.token_type(){
-            // let x : String     
-            //typed = true;
-            unimplemented!();
-            // Expect type, consume
-        }
-        self.show_tokens("var_declaration - After checking Colon");
-                
-        // Register variable in the parser
-        self.variables.push(NamedVar{
-            name: var_name,
-            value: Value::Nil,
-            typed: typed,
-            initialized: initialized,
-        });
-        let depth = self.variable_count.len();
-        self.variable_count[depth-1] += 1;
+        
+        // Register Variable as NIL... define later
+        self.push_variable(var_name, Value::Nil);
 
-        // Emit operation for the VM.
-        self.emit_byte(Operation::PushVar(Var{
-            value: Value::Nil,
-            typed: typed,
-            initialized: false,
-        }));
 
         // Count the declared variable
         *n_declared_vars+=1;        
@@ -520,7 +580,10 @@ impl <'a>Parser<'a>{
     /// # EBNF Grammar:
     /// while_statement -> while EXPRESSION BLOCK
     fn while_statement(&mut self){
-        let while_start = self.chunk().code().len();
+        let while_start = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
 
         // Compile expression (puts a boolean on the stack)
         self.expression();
@@ -530,7 +593,10 @@ impl <'a>Parser<'a>{
 
         /* PROCESS BODY */
         // Mark the beginning of body (for looping)
-        let body_start = self.chunk().code().len();
+        let body_start = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
@@ -542,7 +608,10 @@ impl <'a>Parser<'a>{
         self.end_scope();
 
         // Mark the end
-        let body_end = self.chunk().code().len();
+        let body_end = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
 
         // Add jump back, before the expression
         self.emit_byte(Operation::JumpBack(body_end - while_start));
@@ -566,7 +635,10 @@ impl <'a>Parser<'a>{
 
         /* PROCESS BODY */
         // Mark the beginning of body (for looping)
-        let body_start = self.chunk().code().len();
+        let body_start = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
@@ -578,7 +650,11 @@ impl <'a>Parser<'a>{
         self.end_scope();
 
         // Mark the end
-        let body_end = self.chunk().code().len();
+        let body_end = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
+
         // Patch jump
         let body_length = body_end - body_start;
         //self.chunk().patch_code(body_start-1 ,Operation::JumpIfFalse(body_length+1)); 
@@ -588,11 +664,18 @@ impl <'a>Parser<'a>{
         if self.consume(TokenType::Else){
             // This is patched after the statement is processed
             self.emit_byte(Operation::JumpIfTrue(0));
-            let body_start = self.chunk().code().len();
+            let body_start = match self.chunk_len(){
+                Some(i)=>i,
+                None => return
+            };
             self.statement();
 
             // Mark the end
-            let body_end = self.chunk().code().len();
+            let body_end = match self.chunk_len(){
+                Some(i)=>i,
+                None => return
+            };
+
             // Patch jump
             let body_length = body_end - body_start;
             //self.chunk().patch_code(body_start-1 ,Operation::JumpIfTrue(body_length+1)); 
@@ -631,7 +714,10 @@ impl <'a>Parser<'a>{
         
         /* PROCESS BODY */
         // Mark the beginning of body (for looping)
-        let body_start = self.chunk().code().len();
+        let body_start = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
@@ -643,7 +729,10 @@ impl <'a>Parser<'a>{
         self.end_scope();
 
         // Mark the end of the scope
-        let body_end = self.chunk().code().len();
+        let body_end = match self.chunk_len(){
+            Some(i)=>i,
+            None => return
+        };
         
         // Close the main scope
         self.end_scope();
@@ -758,6 +847,10 @@ impl <'a>Parser<'a>{
     
 
     /* ERROR FUNCTIONS */
+
+    pub fn error_no_current_function(&mut self){
+        self.error_at_current(format!("Trying to use Parser's current function... found None"))
+    }
 
     pub fn error_at_current(&mut self, msg: String){
         self.error_at(self.current, msg);
@@ -878,7 +971,7 @@ mod tests {
         }
         
         number(&mut parser);        
-        if let Operation::PushNumber(found) = parser.chunk().code().last().unwrap() {            
+        if let Operation::PushNumber(found) = parser.chunk().unwrap().code().last().unwrap() {            
             assert_eq!(2.0,*found);            
         }else{
             assert!(false);
@@ -899,7 +992,7 @@ mod tests {
         
         number(&mut parser);
         number(&mut parser);        
-        if let Operation::PushNumber(found) = parser.chunk().code().last().unwrap() {            
+        if let Operation::PushNumber(found) = parser.chunk().unwrap().code().last().unwrap() {            
             assert_eq!(2.1,*found);            
         }else{
             assert!(false);
@@ -913,11 +1006,11 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
-        debug::chunk(&parser.chunk(), format!("some chunck"));
+        parser.compile();
+        debug::chunk(&parser.chunk().unwrap(), format!("some chunck"));
 
         let mut vm = VM::new();
-        let (code,lines)=parser.chunk().to_slices();        
+        let (code,lines)=parser.chunk().unwrap().to_slices();        
 
         vm.run(code, lines);
         if let Ok(v) = vm.pop(){
@@ -937,14 +1030,14 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
+        parser.compile();
         assert!(!parser.had_error);
         
 
         // Do it slowly now
 
         let mut parser = Parser::new(&source);
-        // prime the pump (done in self.program())
+        // prime the pump (done in self.compile())
         parser.advance();
 
         /* DECLARE X */
@@ -992,44 +1085,19 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
-
-        assert_eq!(3,parser.variables.len());
+        if let Some(f) = parser.compile(){
+            assert_eq!(3,parser.variables.len());
         
-        assert_eq!(parser.variables[0].name,"x".to_string());
-        let x = parser.variables.get(0).unwrap();
-        if let Value::Number(v) = x.value {
-            assert_eq!(v,2.);
-        }
-        if let Value::Nil = x.value {
-            assert!(true);
+            assert_eq!(parser.variables[0],"x".to_string());                        
+            assert_eq!(parser.variables[1],"y".to_string());        
+            assert_eq!(parser.variables[2],"z".to_string());        
+            
+            debug::chunk(f.chunk(),"the_chunk".to_string());
         }else{
-            assert!(false);
-        }
-        
-        assert_eq!(parser.variables[1].name,"y".to_string());
-        let y = parser.variables.get(1).unwrap();
-        if let Value::Nil = x.value {
-            assert!(true);
-        }
-        if let Value::Nil = y.value {
-            assert!(true);
-        }else{
-            assert!(false);
+            assert!(false)
         }
 
-        assert_eq!(parser.variables[2].name,"z".to_string());
-        let z = parser.variables.get(2).unwrap();
-        if let Value::Bool(v) = z.value {
-            assert!(v);
-        }
-        if let Value::Nil = y.value {
-            assert!(true);
-        }else{
-            assert!(false);
-        }
         
-        debug::chunk(&parser.chunk(),"the_chunk".to_string());
     }
 
 
@@ -1047,44 +1115,20 @@ mod tests {
 
 
         let mut parser = Parser::new(&source);
-        parser.program();
+        if let Some(f) = parser.compile(){
+            debug::chunk( f.chunk() ,"the_chunk".to_string());
+        }else{
+            assert!(false)
+        }
 
         assert_eq!(3,parser.variables.len());
         
-        assert_eq!(parser.variables[0].name,"x".to_string());
-        let x = parser.variables.get(0).unwrap();
-        if let Value::Number(v) = x.value {
-            assert_eq!(v,2.);
-        }
-        if let Value::Nil = x.value {
-            assert!(true);
-        }else{
-            assert!(false);
-        }
+        assert_eq!(parser.variables[0],"x".to_string());                
+        assert_eq!(parser.variables[1],"y".to_string());
+        assert_eq!(parser.variables[2],"z".to_string());
         
-        assert_eq!(parser.variables[1].name,"y".to_string());
-        let y = parser.variables.get(1).unwrap();
-        if let Value::Nil = x.value {
-            assert!(true);
-        }
-        if let Value::Nil = y.value {
-            assert!(true);
-        }else{
-            assert!(false);
-        }
-
-        assert_eq!(parser.variables[2].name,"z".to_string());
-        let z = parser.variables.get(2).unwrap();
-        if let Value::Bool(v) = z.value {
-            assert!(v);
-        }
-        if let Value::Nil = y.value {
-            assert!(true);
-        }else{
-            assert!(false);
-        }
         
-        debug::chunk(&parser.chunk(),"the_chunk".to_string());
+        
     }
 
     #[test]
@@ -1093,7 +1137,7 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
+        parser.compile();
         assert!(parser.current_scope_has_variable(&format!("x")));
         assert!(!parser.current_scope_has_variable(&format!("y")));
     }
@@ -1104,12 +1148,12 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
+        parser.compile();
         assert!(!parser.had_error);
 
         // Now do it more slowly
 
-        // prime the pump (done in self.program())
+        // prime the pump (done in self.compile())
         let mut parser = Parser::new(&source);
         parser.advance();
 
@@ -1152,7 +1196,7 @@ mod tests {
         assert_eq!(parser.variable_count[0],0);
         
 
-        // Prime the pump... this is done by program()
+        // Prime the pump... this is done by compile()
         parser.advance();
 
         // Consume the first variable  
@@ -1163,14 +1207,11 @@ mod tests {
         // There is only the "main" scope
         assert_eq!(parser.scope_depth(),1);     
         assert_eq!(parser.variables.len(),1);
-        assert_eq!(parser.variables[0].name,"x".to_string());
+        assert_eq!(parser.variables[0],"x".to_string());
         assert_eq!(parser.variable_count.len(),1);
         assert_eq!(parser.variable_count[0],1);
-        if let Operation::PushVar(Var{
-            value: Value::Nil,
-            typed: false,
-            initialized: false,
-        }) = parser.chunk().code()[0]{
+
+        if let Operation::PushVar(Value::Nil) = parser.chunk().unwrap().code()[0]{
             assert!(true);
         }else{assert!(false)};
 
@@ -1184,15 +1225,13 @@ mod tests {
         // There is the "main" scope, and the new one
         assert_eq!(parser.scope_depth(),2);     
         assert_eq!(parser.variables.len(),2);
-        assert_eq!(parser.variables[1].name,"y".to_string());
+        assert_eq!(parser.variables[1],"y".to_string());
         assert_eq!(parser.variable_count.len(),2);
         assert_eq!(parser.variable_count[0],1);
         assert_eq!(parser.variable_count[1],1);
-        if let Operation::PushVar(Var{
-            typed: false,
-            initialized: false,
-            value: Value::Nil
-        }) = parser.chunk().code()[1]{
+
+        
+        if let Operation::PushVar(Value::Nil) = parser.chunk().unwrap().code()[1]{
             assert!(true);
         }else{assert!(false)};
 
@@ -1214,17 +1253,13 @@ mod tests {
         assert_eq!(parser.scope_depth(),1);     
         assert_eq!(parser.variable_count.len(),1);
         assert_eq!(parser.variables.len(),2);
-        assert_eq!(parser.variables[1].name,"z".to_string());
+        assert_eq!(parser.variables[1],"z".to_string());
         assert_eq!(parser.variable_count[0],2);
-        if let Operation::PushVar(Var{
-            typed: false,
-            initialized: false,
-            value: Value::Nil
-        }) = parser.chunk().code()[1]{
+        if let Operation::PushVar(Value::Nil) = parser.chunk().unwrap().code()[1]{
             assert!(true);
         }else{assert!(false)};
         
-        debug::chunk(&parser.chunk(), format!("some chunck"));
+        debug::chunk(&parser.chunk().unwrap(), format!("some chunck"));
     }
 
     #[test]
@@ -1233,28 +1268,32 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
-
-        // Check the operations...
+        if let Some(f) = parser.compile(){
+            // Check the operations...
         
-        // Push 3
-        if let Operation::PushNumber(v) = parser.chunk().code()[0]{
-            assert_eq!(3.0,v);
-        }else{assert!(false)};
+            // Push 3
+            if let Operation::PushNumber(v) = f.chunk().code()[0]{
+                assert_eq!(3.0,v);
+            }else{assert!(false)};
 
-        // set jump.
-        if let Operation::JumpIfFalse(v) = parser.chunk().code()[1]{
-            assert_eq!(2,v);
-        }else{assert!(false)};
+            // set jump.
+            if let Operation::JumpIfFalse(v) = f.chunk().code()[1]{
+                assert_eq!(2,v);
+            }else{assert!(false)};
 
-        // Pop variables.
-        if let Operation::PopVars(n) = parser.chunk().code()[2]{
-            assert_eq!(0,n);
-        }else{assert!(false)};
+            // Pop variables.
+            if let Operation::PopVars(n) = f.chunk().code()[2]{
+                assert_eq!(0,n);
+            }else{assert!(false)};
+
+            
+
+            debug::chunk(f.chunk(), format!("for loop chunck"));
+        }else{
+            assert!(false)
+        }
 
         
-
-        debug::chunk(&parser.chunk(), format!("for loop chunck"));
     }
 
     #[test]
@@ -1263,31 +1302,37 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
-
-        // Check the operations...
         
-        // Push 3
-        if let Operation::PushNumber(v) = parser.chunk().code()[0]{
-            assert_eq!(3.0,v);
-        }else{assert!(false)};
+        if let Some(f) = parser.compile(){
+    // Check the operations...
+            
+            // Push 3
+            if let Operation::PushNumber(v) = f.chunk().code()[0]{
+                assert_eq!(3.0,v);
+            }else{assert!(false)};
 
-        // set jump.
-        if let Operation::JumpIfFalse(v) = parser.chunk().code()[1]{
-            assert_eq!(3,v);
-        }else{assert!(false)};
+            // set jump.
+            if let Operation::JumpIfFalse(v) = f.chunk().code()[1]{
+                assert_eq!(3,v);
+            }else{assert!(false)};
 
-        // Pop variables.
-        if let Operation::PopVars(n) = parser.chunk().code()[2]{
-            assert_eq!(0,n);
-        }else{assert!(false)};
+            // Pop variables.
+            if let Operation::PopVars(n) = f.chunk().code()[2]{
+                assert_eq!(0,n);
+            }else{assert!(false)};
 
-        // Jump back.
-        if let Operation::JumpBack(n) = parser.chunk().code()[3]{
-            assert_eq!(3,n);
-        }else{assert!(false)};
+            // Jump back.
+            if let Operation::JumpBack(n) = f.chunk().code()[3]{
+                assert_eq!(3,n);
+            }else{assert!(false)};
 
-        debug::chunk(&parser.chunk(), format!("for loop chunck"));
+            debug::chunk(f.chunk(), format!("for loop chunck"));
+        }else{
+            assert!(false)
+        }
+        
+
+        
     }
 
     #[test]
@@ -1296,82 +1341,129 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
+        if let Some(f) = parser.compile(){
+            // Check the operations...
+            
+            // Push i
+            if let Operation::PushVar(_) = f.chunk().code()[0]{
+                assert!(true);
+            }else{assert!(false)};
 
-        // Check the operations...
+            // Push j
+            if let Operation::PushVar(_) = f.chunk().code()[1]{
+                assert!(true);
+            }else{assert!(false)};
+
+            // Push 3
+            if let Operation::PushNumber(v) = f.chunk().code()[2]{
+                assert_eq!(3.0,v);
+            }else{assert!(false)};
+
+            // ... body happens
+
+            // Pop vars from body        
+            if let Operation::PopVars(_) = f.chunk().code()[3]{
+                assert!(true);
+            }else{assert!(false)};
+
+            // Pop vars from main scope        
+            if let Operation::PopVars(_) = f.chunk().code()[4]{
+                assert!(true);
+            }else{assert!(false)};
+
+            // FOR LOOP
+            if let Operation::ForLoop(n_vars,length) = f.chunk().code()[5]{
+                assert_eq!(n_vars,2);
+                assert_eq!(length,1); // The PopVars operation
+            }else{assert!(false)};
+
+            debug::chunk(f.chunk(), format!("for loop chunck"));
+        }else{
+            assert!(false)
+        }
+
         
-        // Push i
-        if let Operation::PushVar(_) = parser.chunk().code()[0]{
-            assert!(true);
-        }else{assert!(false)};
-
-        // Push j
-        if let Operation::PushVar(_) = parser.chunk().code()[1]{
-            assert!(true);
-        }else{assert!(false)};
-
-        // Push 3
-        if let Operation::PushNumber(v) = parser.chunk().code()[2]{
-            assert_eq!(3.0,v);
-        }else{assert!(false)};
-
-        // ... body happens
-
-        // Pop vars from body        
-        if let Operation::PopVars(_) = parser.chunk().code()[3]{
-            assert!(true);
-        }else{assert!(false)};
-
-        // Pop vars from main scope        
-        if let Operation::PopVars(_) = parser.chunk().code()[4]{
-            assert!(true);
-        }else{assert!(false)};
-
-        // FOR LOOP
-        if let Operation::ForLoop(n_vars,length) = parser.chunk().code()[5]{
-            assert_eq!(n_vars,2);
-            assert_eq!(length,1); // The PopVars operation
-        }else{assert!(false)};
-
-        debug::chunk(&parser.chunk(), format!("for loop chunck"));
         
     }
 
+    /*
     #[test]
     fn test_array_expression(){
         let raw_source = "let x = [0,1,2,3]".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.program();
+        if let Some(f) = parser.compile(){
+            let n_ops = f.chunk().code().len();
 
-        let n_ops = parser.chunk().code().len();
+            if let Operation::PushArray(4) = f.chunk().code()[n_ops-3]{
+                assert!(true);
+            }else{
+                assert!(false)
+            };
+            
+            for i in 0..4{            
+                match f.chunk().code()[i+1]{
+                    Operation::PushNumber(v) => assert_eq!(i as f64,v),
+                    _ => panic!("At i = {}", i)
+                }
 
-        if let Operation::PushArray(4) = parser.chunk().code()[n_ops-2]{
-            assert!(true);
-        }else{assert!(false)};
-        
-        for i in 0..4{            
-            match parser.chunk().code()[i+1]{
-                Operation::PushNumber(v) => assert_eq!(i as f64,v),
-                _ => panic!("At i = {}", i)
             }
-
+                    
+            debug::chunk(f.chunk(), format!("array chunck"));
+        }else{
+            assert!(false)
         }
+
         
-    
-        debug::chunk(&parser.chunk(), format!("array chunck"));
     }
+    */
 
     #[test]
     fn test_function_expression(){
-        let raw_source = "let x = fn(a,b,c) { }".to_string();
+        let raw_source = "let x = fn(b,c) { }".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);        
-        parser.program();
-        assert!(!parser.had_error);
+        if let Some(f) = parser.compile(){
+            assert!(!parser.had_error);
 
-        debug::chunk(&parser.chunk(), format!("function expression chunck"));
+            debug::chunk(f.chunk(), format!("function expression chunck"));
+
+            let ch = f.chunk().code();
+            if let Operation::PushFunction(v) = &ch[1] {
+                match v {
+                    Function::Script(s)=>{
+                        assert_eq!(s.n_args,2);
+                        debug::chunk(s.chunk(), format!("fn {}()", s.name));
+                    },
+                    Function::Rust(_)=>assert!(false)
+                }
+            }else {
+                panic!(" Found -> '{}'",&parser.variables[0].to_string())
+            }
+        }else{
+            assert!(false)
+        }
+        
+        
+    }
+
+
+    #[test]
+    fn test_function_delaration(){
+        let raw_source = "fn x(a,b,c) { }".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);        
+        if let Some(f) = parser.compile(){
+            assert!(!parser.had_error);
+
+            debug::chunk(f.chunk(), format!("function expression chunck"));
+        }else{
+            assert!(false)
+        }
+        
+                
     }
 }

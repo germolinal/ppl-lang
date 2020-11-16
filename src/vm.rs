@@ -1,11 +1,9 @@
-use std::rc::Rc;
 
 
 use crate::operations::*;
 use crate::values::*;
-use crate::variable::Var;
 use crate::value_trait::ValueTrait;
-use crate::array::Array;
+//use crate::array::Array;
 
 #[cfg(debug_assertions)]
 use crate::debug::*;
@@ -27,7 +25,8 @@ impl InterpretResult {
 
 pub struct VM {
     stack: Vec<Value>,
-    var_stack: Vec<Var>,    
+    var_stack: Vec<Value>,    
+    constants: Vec<Value>,
 }
 
 
@@ -38,6 +37,7 @@ impl VM {
         Self {
             var_stack: Vec::with_capacity(1024),
             stack: Vec::with_capacity(1024),                        
+            constants: Vec::with_capacity(1024),
         }
 
     }    
@@ -51,8 +51,7 @@ impl VM {
     */
 
     fn define_var(&mut self, var_index: usize, v: Value){
-        self.var_stack[var_index].value = v;
-        self.var_stack[var_index].initialized = true;
+        self.var_stack[var_index] = v;        
     }
     
     pub fn run(&mut self, code: &[Operation], lines: &[usize]) -> InterpretResult {
@@ -98,42 +97,72 @@ impl VM {
                 },                
                 Operation::PushNumber(v)=>{
                     self.push(Value::Number(*v))
-                },                
+                },         
+                /*       
                 Operation::PushString(v)=>{
-                    self.push(Value::StringV( Rc::clone(v)) )
+                    self.push(Value::StringV( *v ) )
                 },        
                 Operation::PushFunction(v)=>{
-                    self.push(Value::Function(v.clone()))
+                    self.push(Value::Function( *v ))
                 },     
                 Operation::PushArray(n)=>{
                     let mut ret = Array::with_capacity(*n);
                     for i in 0..*n {
                         if let Ok(v) = self.pop(){
-                            ret[n-1-i]=v;
+                            ret[n - 1 -i]=v;
                         }else{
                             return InterpretResult::RuntimeError(format!("Ran out of element in stack when building Array of {} elements",n))
                         }
                     }
-                    self.push(Value::Array( Rc::new(ret)) )
+                    self.push(Value::Array( Box::new(ret)) )
                 },                
                 Operation::PushObject(v)=>{
-                    self.push(Value::Object( Rc::clone(v)) )
+                    self.push(Value::Object( *v ) )
                 },                
                 Operation::PushGeneric(v)=>{
-                    self.push(Value::Generic( Rc::clone(v)) )
+                    self.push(Value::Generic( *v ))
                 },
-
-
+                
+                
+                */
                 Operation::PushVar(v)=>{
-                    // This does not move objects... it 
-                    // clones the reference to them
-                    self.push_var(v.copy());
+                    // Pushes an object
+                    self.push_var(*v);
                 },
+                
+                Operation::PushVarRef(i)=>{
+                    let val = &self.var_stack.get(*i).unwrap();                     
+                    match val {
+                        // Copied.
+                        Value::Nil => self.push(Value::Nil),
+                        Value::Number(v)=>self.push(Value::Number(*v)),
+                        Value::Bool(v)=>self.push(Value::Bool(*v)),
+                        /*
+                        Value::Function(_)=> self.push(Value::VarRef(*i)),
+                        Value::Array(v) => {
+                            
+                            self.push(v.clone_to_value());
+                        },
+                        Value::StringV(v) => {
+                            let s = *v.clone();
+                            self.push(Value::StringV(Box::new(s)))
+                        },
+
+                        // Referenced
+                        Value::Object(_)=> self.push(Value::VarRef(*i)),
+                        Value::Generic(_)=> self.push(Value::VarRef(*i)),
+                        */
+                        Value::HeapRef(_) => panic!("Unexpected behaviour... found a VarRef in the Variable Stack")
+
+                    }                                        
+                },
+
                 Operation::PopVars(n)=>{                    
                     for _ in 0..*n {
                         self.pop_var().unwrap();                    
                     }
                 },
+                
                 Operation::DefineVar(n)=>{
                     match self.pop(){
                         Ok(v)=>{                            
@@ -278,7 +307,7 @@ impl VM {
 
                         // Run body... lets do this:
                         let ini = ip;
-                        let fin = ip+body_length;                        
+                        let fin = ip + body_length;                        
                         let sub_code = &code[ini..fin];
                         let sub_lines = &lines[ini..fin];
                         match self.run(sub_code, sub_lines){
@@ -300,7 +329,7 @@ impl VM {
                     let value = self.pop().unwrap();
                     if let Value::Bool(v) = value {
                         if !v {
-                            ip+=n;
+                            ip += n;
                         }
                     }else{
                         return InterpretResult::RuntimeError(format!("Expression in while loop ( while EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
@@ -310,15 +339,18 @@ impl VM {
                     let value = self.pop().unwrap();
                     if let Value::Bool(v) = value {
                         if v {
-                            ip+=n;
+                            ip += n;
                         }
                     }else{
                         return InterpretResult::RuntimeError(format!("Expression in while loop ( while EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
                     }
                 },
                 Operation::JumpBack(n)=>{
-                    ip-=n;
+                    ip -= n;
                 },
+                Operation::PushFunction(f)=>{
+                    unimplemented!();
+                }
 
             }// end of match
             ip += 1;
@@ -332,11 +364,11 @@ impl VM {
         self.stack.push(value);        
     }
 
-    fn push_var(&mut self,var: Var){
+    fn push_var(&mut self,var: Value){
         self.var_stack.push(var);     
     }
 
-    fn pop_var(&mut self)->Result<Var,&str>{        
+    fn pop_var(&mut self)->Result<Value,&str>{        
         if let Some(v)= self.var_stack.pop(){
             Ok(v)
         }else{

@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use crate::parser::*;
 use crate::token::*;
@@ -32,14 +31,18 @@ pub fn unary(parser: &mut Parser){
 }
 
 pub fn string(parser: &mut Parser){
+    /*
     let v = parser.previous().source_text(parser.source());                
-    parser.emit_byte(Operation::PushString(Rc::new(v)));
+    parser.emit_byte(Operation::PushString(Box::new(v)));
+    */
+    unimplemented!();
 }
 
 pub fn array(parser: &mut Parser){
-    
+    unimplemented!();
+    /*
     //parser.advance();
-
+    
     let mut n : usize = 0;
     
     while !parser.consume(TokenType::RightBracket){        
@@ -49,13 +52,14 @@ pub fn array(parser: &mut Parser){
         if !parser.consume(TokenType::Comma) && !parser.check(TokenType::RightBracket) {
             parser.error_at_current(format!("Expecting ',' between Array elements."));
         }
-
+        
         if parser.check(TokenType::EOF){
             parser.error_at_current(format!("Expecting ']' at the end of Array"));
         }
     }
-        
+    
     parser.emit_byte(Operation::PushArray(n));
+    */
 }
 
 pub fn number(parser: &mut Parser){
@@ -145,10 +149,10 @@ pub fn literal(parser: &mut Parser){
     }
 }
 
-pub fn function(parser:&mut Parser)->Option<Rc<ScriptFn>>{
+pub fn function(parser:&mut Parser, name: &String)->Option<Box<ScriptFn>>{
     // starts from the (), so it covers
     // both fn(){} and fn ID(){}
-    // this becomes { let args[]; { ...body... }}
+    // this becomes { let args[]; ...body...  }
     parser.show_tokens("function()");
     if !parser.consume(TokenType::LeftParen){
         parser.error_at_current(format!("Expecting '(' when defining function"));        
@@ -156,11 +160,17 @@ pub fn function(parser:&mut Parser)->Option<Rc<ScriptFn>>{
     }
 
     // Get a copy of the current function
-    let old_func = Rc::clone(parser.current_function());
+    let old_func = match parser.take_current_function(){
+        Some(f)=>f,
+        None => {
+            parser.error_no_current_function();
+            return None
+        }
+    };
 
-    // Create a new unnamed function, and plug it to the 
+    // Create a new function, and plug it to the 
     // parser
-    let new_func = Rc::new(ScriptFn::new("".to_string()));
+    let new_func = Box::new(ScriptFn::new(&name));
     parser.set_function(new_func); 
 
     // Open main scope
@@ -178,27 +188,34 @@ pub fn function(parser:&mut Parser)->Option<Rc<ScriptFn>>{
         parser.error_at_current(format!("Expecting '{{' for opening body of function"));        
         return None;
     }
-    // Open, process, and close body
-    parser.begin_scope();
-    parser.block();
-    parser.end_scope();
 
+    // Open, process, and close body    
+    parser.block();
+    
     // Close main scope
     parser.end_scope();
 
     parser.show_tokens("function()  2");
 
     // Get the created function back.
-    let new_func = Rc::clone(parser.current_function());
+    let mut new_func = match parser.take_current_function(){
+        Some(f)=>f,
+        None => {
+            parser.error_no_current_function();
+            return None
+        }
+    };
     
     // Restore the old one
     parser.set_function(old_func);
-
+    new_func.set_n_args(n_vars);
+    
     return Some(new_func);
 }
 
+/// Anonymous function parser
 pub fn function_value(parser:&mut Parser){
-    match function(parser){
+    match function(parser,&format!("<Anonymous Function>")){
         Some(f)=>{
             // f is now the function.
             let v = Function::Script(f);
@@ -208,4 +225,18 @@ pub fn function_value(parser:&mut Parser){
     }
 }
 
+pub fn variable( parser: &mut Parser){
+    // search back for a variable with the same name
+    let var_name = if parser.consume(TokenType::Identifier){
+        parser.previous().source_text(parser.source())
+    }else{
+        return parser.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",parser.previous().source_text(parser.source()) ))
+    };
+
+    if let Some(i) = parser.find_var(&var_name) {
+        return parser.emit_byte(Operation::PushVarRef(i));
+    }else{
+        return parser.error_at_current(format!("Could not find Variable '{}'", var_name ))
+    }
+}
 

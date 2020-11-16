@@ -1,8 +1,11 @@
 extern crate ppl_lib;
 use std::env;
 use std::fs;
-use ppl_lib::vm::VM;
-use ppl_lib::parser::Parser;
+
+use ppl_lib::handler::Handler;
+// Packages
+use ppl_lib::io::register_io_package;
+
 
 
 pub fn main(){
@@ -10,18 +13,30 @@ pub fn main(){
     println!("{:?}", args);
 
     
-    //let query = &args[1];
-    let filename = &args[1];
-    let script = fs::read(filename).unwrap();
+    if args.len() > 1{
 
-    let mut parser = Parser::new(&script);
-    parser.program();
-    let _vm = VM::new();    
+        //let query = &args[1];
+        let filename = &args[1];
+        let script = fs::read(filename).unwrap();
+    
+        let mut handler = Handler::new(&script);
+        
+        // Reguster packages
+        register_io_package(&mut handler);
+    
+        //    println!("Searching for {}", query);
+        println!("In file {}", filename);
 
-    // file contents.
+        // Run file
+        handler.run();
 
-//    println!("Searching for {}", query);
-    println!("In file {}", filename);
+    }else{
+        panic!("A script File is required")
+    }
+
+
+
+
     
 }
 

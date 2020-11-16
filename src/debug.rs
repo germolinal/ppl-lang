@@ -90,6 +90,7 @@ pub mod debug {
             Operation::PushNumber(v)=>{
                 return println!("OP_PUSH_NUMBER | '{}'", v);         
             },
+            /*
             Operation::PushString(v)=>{
                 return println!("OP_PUSH_STRING | '\"{}'\"", v);         
             },
@@ -102,6 +103,7 @@ pub mod debug {
             Operation::PushGeneric(v)=>{
                 return println!("OP_PUSH_GENERIC | '{}'", v.type_name());         
             },
+            */
             Operation::PushFunction(v)=>{
                 return println!("OP_PUSH_FUNCTION | '{}()'", v.get_name());
             }
@@ -109,6 +111,9 @@ pub mod debug {
 
             Operation::PushVar(_)=>{
                 return println!("OP_PUSH_VAR");
+            },
+            Operation::PushVarRef(i)=>{
+                return println!("OP_PUSH_VAR_REF | {}", i);
             },
             Operation::PopVars(n)=>{
                 return println!("OP_POP_VARS | {}",n);
@@ -160,8 +165,7 @@ pub mod debug {
     
     /// Prints the instruction set into the 
     /// terminal... not really used outside of
-    /// development environments
-    #[cfg(test)]
+    /// development environments    
     pub fn chunk(chunk : &Chunk, name: String){
         
         println!("== {} ==\n", name);
@@ -228,29 +232,5 @@ pub mod debug {
                 
         format!("{} '{}'", token_name,token.source_text(source) )
     }
-    
-    
-    /***********/
-    /* TESTING */
-    /***********/
-    
-    #[cfg(test)]
-    mod tests {
-        //use super::*;
-        //use crate::values::*;
-    
-        /*
-        #[test]
-        fn test_dissassemble(){
-            let v = 1.2;
-            let mut c = Chunk::new();
-    
-            let constant_i = c.add_constant(Value::new_number(v));                        
-            c.write_operation(Operation::Constant(constant_i), 123);                
-            c.write_operation(Operation::Return, 0);
-            
-            chunk(&c, "The chunk".to_string());        
-        }
-        */
-    }
+       
 }

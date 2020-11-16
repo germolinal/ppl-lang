@@ -1,15 +1,15 @@
-use crate::variable::Var;
-use std::rc::Rc;
+//use crate::variable::Var;
+//use std::rc::Rc;
 
-use crate::value_trait::ValueTrait;
-use crate::string::StringV;
-use crate::object::Object;
+//use crate::value_trait::ValueTrait;
+//use crate::string::StringV;
+//use crate::object::Object;
 use crate::function::Function;
-
+use crate::values::Value;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
-#[derive(Clone)]
+//#[derive(Clone)]
 pub enum Operation {
     Return,
     Negate,
@@ -27,15 +27,16 @@ pub enum Operation {
     //Constant(usize),
     PushBool(bool),
     PushNumber(f64),  
-    PushString(Rc<StringV>),
-    PushArray(usize), // the length of the array
-    PushObject(Rc<Object>),
     PushFunction(Function),
-    PushGeneric(Rc<dyn ValueTrait>),
+    //PushString(Box<StringV>),
+    //PushArray(usize), // the length of the array
+    //PushObject(Box<Object>),
+    //PushGeneric(Box<dyn ValueTrait>),
 
     PopVars(usize),
     DefineVar(usize),
-    PushVar(Var),
+    PushVar(Value),
+    PushVarRef(usize),
     
     ForLoop(usize,usize),
     JumpIfFalse(usize),
