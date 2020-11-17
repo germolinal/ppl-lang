@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::function::Function;
 use crate::package::{Packages, Package};
 use crate::vm::{VM,InterpretResult};
 use crate::parser::Parser;
@@ -29,11 +28,11 @@ impl <'a>Handler<'a> {
 
                 let (code, lines) = f.chunk().to_slices();//self.parser.current_function().chunk().to_slices();
 
-                match self.vm.run(code,lines){
-                    InterpretResult::Ok => {
+                match self.vm.run(code,lines, f.chunk().constants()){
+                    InterpretResult::Ok(_) => {
     
                     },
-                    InterpretResult::CompileError(e)=>panic!("Compile Error: {}",e),
+                    //InterpretResult::CompileError(e)=>panic!("Compile Error: {}",e),
                     InterpretResult::RuntimeError(e)=>panic!("Runtime Error: {}",e),
     
                 }

@@ -1,5 +1,5 @@
 use crate::chunk::Chunk;
-
+use crate::value_trait::ValueTrait;
 
 pub struct ScriptFn {
     pub name: String,
@@ -20,6 +20,9 @@ impl ScriptFn {
         }
     }
     
+    pub fn push_constant(&mut self, v: Box<dyn ValueTrait>)->usize{
+        self.chunk.push_constant(v)
+    }
 
     pub fn chunk(&self)->&Chunk{
         &self.chunk

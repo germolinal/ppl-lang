@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::rc::Rc;
+
 
 use crate::function::Function;
 use crate::rust_fn::*;
@@ -26,7 +26,7 @@ impl Package{
             func: func
         };
         
-        let function: Function = Function::Rust(Box::new(rust_fn));
+        let function: Function = Function::Rust(rust_fn);
 
         self.register_func(function)
     }  

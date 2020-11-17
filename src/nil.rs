@@ -1,7 +1,8 @@
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
+use std::any::Any;
 
-#[derive(Default)]
+
 pub struct Nil;
 
 impl Nil {
@@ -20,7 +21,9 @@ impl ValueTrait for Nil {
         return format!("Nil")
     }        
 
-    
+    fn as_any(&self) -> &dyn Any{
+        self
+    }    
 
     fn clone_to_value(&self)->Value{
         Value::Nil        

@@ -41,8 +41,8 @@ pub mod debug {
     
         match op {
             
-            Operation::Return => {
-                return simple_instruction(&"OP_RETURN", offset)
+            Operation::Return(n) => {
+                return println!("OP_RETURN '{}'", n);
             },
     
             /*
@@ -104,8 +104,8 @@ pub mod debug {
                 return println!("OP_PUSH_GENERIC | '{}'", v.type_name());         
             },
             */
-            Operation::PushFunction(v)=>{
-                return println!("OP_PUSH_FUNCTION | '{}()'", v.get_name());
+            Operation::PushHeapRef(v)=>{
+                return println!("OP_PUSH_HEAP_REF | slot '{}'", v);
             }
 
 
@@ -115,11 +115,14 @@ pub mod debug {
             Operation::PushVarRef(i)=>{
                 return println!("OP_PUSH_VAR_REF | {}", i);
             },
+            Operation::EvalVar(i)=>{
+                return println!("OP_EVAL_VAR | {}", i);
+            },
             Operation::PopVars(n)=>{
                 return println!("OP_POP_VARS | {}",n);
             },
-            Operation::DefineVar(n)=>{
-                return println!("OP_DEFINE_VAR | {}",n);
+            Operation::DefineVars(n)=>{
+                return println!("OP_DEFINE_VARS | {}",n);
             },
 
             Operation::Equal => {
@@ -142,6 +145,12 @@ pub mod debug {
             Operation::LessEqual => {
                 return simple_instruction("OP_LESS_EQUAL", offset );
             },
+            Operation::And => {
+                return simple_instruction("OP_AND", offset );
+            },
+            Operation::Or => {
+                return simple_instruction("OP_OR", offset );
+            },
 
             Operation::ForLoop(n_vars,body_length)=>{
                 return println!("OP_FOR_LOOP | {} vars, length: {}",n_vars, body_length); 
@@ -157,6 +166,10 @@ pub mod debug {
 
             Operation::JumpBack(n)=>{
                 return println!("OP_JUMP_BACK | {} ops",n); 
+            },
+
+            Operation::Call(n)=>{
+                return println!("OP_CALL | {} args",n); 
             }
 
         }
@@ -190,7 +203,8 @@ pub mod debug {
     
             TokenType::Comma => "COMMA", TokenType::Dot => "DOT",
             TokenType::Minus => "MINUS", TokenType::Plus => "PLUS",  
-            TokenType::Colon=>"COLON", TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
+            //TokenType::Colon=>"COLON", 
+            TokenType::Slash => "SLASH", TokenType::Star => "STAR",     
             /*TokenType::Semicolon => "SEMICOLON",*/
             TokenType::Question => "QUESTION",
 

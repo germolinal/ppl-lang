@@ -1,6 +1,6 @@
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
-
+use std::any::Any;
 
 pub type Number = f64;
 
@@ -20,6 +20,9 @@ impl ValueTrait for Number {
         Value::Number(*self)
     }
 
+    fn as_any(&self) -> &dyn Any{
+        self
+    }
 
     fn negate(&self)->Result<Value,String>{        
         Ok(Value::Number(-self))

@@ -11,7 +11,7 @@ pub enum TokenType{
     LeftBrace, RightBrace,
     LeftBracket, RightBracket,
     Comma, Dot, Minus, Plus,
-    Colon, Slash, Star, //Semicolon,
+    /*Colon,*/ Slash, Star, //Semicolon,
     Question,
 
     // One or two characters

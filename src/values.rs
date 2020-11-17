@@ -1,10 +1,11 @@
+use std::any::Any;
 
 use crate::value_trait::ValueTrait;
 
 use crate::nil::Nil;
 use crate::number::Number;
 use crate::boolean::Boolean;
-use crate::function::Function;
+//use crate::function::Function;
 //use crate::array::Array;
 //use crate::object::Object;
 //use crate::string::StringV;
@@ -21,8 +22,10 @@ pub enum Value {
     Bool(Boolean),
     //Function(Function),
 
-    HeapRef(usize),// this is meant to live on the Stack only
-    
+    // These are meant to live on the Stack only
+    HeapRef(usize),
+    Usize(usize),
+    VarRef(usize),
     /* Heap allocated variables */
     //StringV(Box<StringV>),
     //Array(Box<Array>),
@@ -141,7 +144,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.type_name(),
             //Value::Object(v)=>v.type_name(),
             //Value::Generic(v)=>v.type_name(),
-            Value::HeapRef(_)=>format!("HeapReference")
+            Value::HeapRef(_)=>format!("HeapReference"),
+            Value::Usize(_)=>format!("Usize"),
+            Value::VarRef(_)=>format!("VarRef"),
         })
     }
 
@@ -155,7 +160,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=> v.to_string(),
             //Value::Object(v)=> v.to_string(),
             //Value::Generic(v) => v.to_string(),
-            Value::HeapRef(i)=>format!("VarRev<{}>", i)           
+            Value::HeapRef(i)=>format!("VarRev<{}>", i),          
+            Value::Usize(u)=>format!("Usize<{}>", u),
+            Value::VarRef(u)=>format!("VarRef<{}>",u),
         }
     }
 
@@ -181,10 +188,15 @@ impl ValueTrait for Value  {
             //},
             Value::HeapRef(i)=>{
                 Value::HeapRef(*i)
-            }
+            },          
+            Value::Usize(u)=>Value::Usize(*u),
+            Value::VarRef(u)=>Value::VarRef(*u),
         }
     }
     
+    fn as_any(&self) -> &dyn Any{
+        self
+    }
 
 
     fn not(&self)->Result<Value,String>{
@@ -197,7 +209,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.not(),
             //Value::Object(v)=>v.not(),
             //Value::Generic(v)=>v.not(),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -211,7 +225,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.negate(),
             //Value::Object(v)=>v.negate(),
             //Value::Generic(v)=>v.negate(),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -225,7 +241,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.add(other),
             //Value::Object(v)=>v.add(other),
             //Value::Generic(v)=>v.add(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -239,7 +257,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.subtract(other),
             //Value::Object(v)=>v.subtract(other),
             //Value::Generic(v) => v.subtract(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -253,7 +273,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.multiply(other),
             //Value::Object(v)=>v.multiply(other),
             //Value::Generic(v) => v.multiply(other),  
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")          
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -267,7 +289,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.divide(other),
             //Value::Object(v)=>v.divide(other),
             //Value::Generic(v) => v.divide(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),          
         }
     }
 
@@ -281,7 +305,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.compare_equal(other),
             //Value::Object(v)=>v.compare_equal(other),
             //Value::Generic(v) => v.compare_equal(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -295,7 +321,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.compare_not_equal(other),
             //Value::Object(v)=>v.compare_not_equal(other),
             //Value::Generic(v) => v.compare_not_equal(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -309,7 +337,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.greater(other),
             //Value::Object(v)=>v.greater(other),
             //Value::Generic(v) => v.greater(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -323,7 +353,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.less(other),
             //Value::Object(v)=>v.less(other),
             //Value::Generic(v) => v.less(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }
     }
 
@@ -337,7 +369,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.greater_equal(other),
             //Value::Object(v)=>v.greater_equal(other),
             //Value::Generic(v) => v.greater_equal(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }        
     }
 
@@ -351,7 +385,9 @@ impl ValueTrait for Value  {
             //Value::StringV(v)=>v.less_equal(other),
             //Value::Object(v)=>v.less_equal(other),
             //Value::Generic(v) => v.less_equal(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference")
+            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::Usize(_)=>panic!("Trying to opeate over a usize"),
+            Value::VarRef(_)=>panic!("Trying to opeate over a var reference"),
         }              
     }
 }

@@ -1,7 +1,7 @@
 
 
 use crate::operations::*;
-//use crate::values::ValueTrait;
+use crate::value_trait::ValueTrait;
 
 /// Represents a set of operations and values
 
@@ -12,7 +12,7 @@ pub struct Chunk {
     code : Vec<Operation>,
 
     /// The values contained in the code
-    //constants : Vec<dyn Value>,
+    constants : Vec<Box<dyn ValueTrait>>,
 
     /// The lines at which each instruction was created
     lines : Vec<usize>,
@@ -42,9 +42,9 @@ impl Chunk {
     /// Crates a new empty Chunk    
     pub fn new()->Self{
         Self{
-            code: Vec::new(),//Vec::with_capacity(1024),
-            //constants: Vec::new(),//with_capacity(1024),
-            lines: Vec::new(),//with_capacity(1024),
+            code: Vec::with_capacity(1024),
+            constants: Vec::with_capacity(1024),
+            lines: Vec::with_capacity(1024),
         }
     }
 
@@ -57,11 +57,10 @@ impl Chunk {
         self.code[i]=op;
     }
 
-    /*
-    pub fn constants(&self)->&Vec<dyn ValueTrait>{
-        &self.constants
+    pub fn get_constant(&self, i: usize)->Option<&Box<dyn ValueTrait>>{
+        self.constants.get(i)
     }
-    */
+    
 
     
     pub fn lines(&self)->&Vec<usize>{
@@ -93,20 +92,23 @@ impl Chunk {
         self.lines.push(line);
     }
     
-    /*
+    
     /// Adds a value to the Chunk
     /// # Arguments
     /// * v: the value to add    
-    pub fn add_constant(&mut self, v : dyn ValueTrait)-> usize {
-        //if self.constants.len() >= (std::u8::MAX-1) as usize {
-        //    panic!("The max number of constants in chunk ({}) has been exceeded", std::u8::MAX);
-        //}
+    pub fn push_constant(&mut self, v : Box<dyn ValueTrait>)-> usize {
+        if self.constants.len() >= self.constants.capacity() {
+            panic!("The max number of constants in chunk ({}) has been exceeded", self.constants.capacity());
+        }
 
-        let ret = self.constants.len();// as u8;
-        self.constants.push(v);
-        return ret;
+        self.constants.push(v);        
+        self.constants.len()-1// as u8;
     }
-    */
+
+    pub fn constants(&self)->&Vec<Box<dyn ValueTrait>>{
+        &self.constants
+    }
+    
 
 }
 
@@ -129,7 +131,7 @@ mod tests {
     #[test]
     fn test_write() {
         let mut c = Chunk::new();        
-        c.write_operation(Operation::Return, 0);
+        c.write_operation(Operation::Return(0), 0);
 
         assert_eq!(1, c.code.len());
         

@@ -3,7 +3,7 @@ use crate::debug::*;
 use crate::scanner::*;
 //use crate::operations::*;
 use crate::token::*;
-use crate::chunk::*;
+//use crate::chunk::*;
 use crate::values::*;
 use crate::parse_function::*;
 use crate::function::Function;
@@ -32,7 +32,7 @@ pub enum Precedence{
 
 type ParseFn = fn(&mut Parser);
 
-pub struct ParseRule{
+pub struct ParseRule {
     pub prefix: Option<ParseFn>,
     pub infix: Option<ParseFn>,
     pub precedence: Precedence,
@@ -45,13 +45,10 @@ pub struct Parser<'a>{
     previous: Token,
     had_error: bool,
     panic_mode: bool,
-    scanner: Scanner<'a>,
-    //chunk: Chunk,
+    scanner: Scanner<'a>,    
     
     variables: Vec<String>,
-    variable_count: Vec<usize>,
-    constants: Vec<Box<dyn ValueTrait>>,
-
+    variable_count: Vec<usize>,    
     optimize: bool,
 
     // No need to cover RustFn because it is not scanned.
@@ -77,8 +74,7 @@ impl <'a>Parser<'a>{
             previous: previous,
 
             variables: vec![],
-            variable_count: vec![0],
-            constants: Vec::with_capacity(256),
+            variable_count: vec![0],            
 
             optimize: false,      
             current_function : Some(main_function),                  
@@ -115,22 +111,6 @@ impl <'a>Parser<'a>{
             }
         }
     }
-    
-
-    
-    pub fn chunk(&mut self)->Option<&Chunk> {
-        if self.current_function.is_none(){
-            // We need this to avoid double borrowing.
-            self.error_no_current_function();
-            return None
-        }else{
-            match &self.current_function{
-                Some(f)=>Some(f.chunk()),
-                None=>None
-            }
-        }
-    }
-    
 
     pub fn patch_chunk(&mut self, position: usize, op: Operation){
         match &mut self.current_function{
@@ -143,12 +123,16 @@ impl <'a>Parser<'a>{
         }        
     }
 
-    fn push_to_heap(&mut self, v: Box<dyn ValueTrait>)->usize{
-        let i = self.constants.len();
-
-        self.constants.push(v);
-
-        return i;
+    pub fn push_constant(&mut self, v: Box<dyn ValueTrait>)->Option<usize>{
+        match &mut self.current_function{
+            Some(f)=>{
+                Some(f.push_constant(v))
+            }
+            None => {
+                self.error_no_current_function();
+                None              
+            }
+        }     
     }
 
     /* UTILITY FUNCTIONS */
@@ -286,7 +270,8 @@ impl <'a>Parser<'a>{
             TokenType::Return |
             TokenType::Let | 
             TokenType::While | 
-            TokenType::EOF | TokenType::Error             
+            TokenType::Break | TokenType::In |
+            TokenType::EOF | TokenType::Error            
             => {
                 ParseRule{
                     prefix:None,
@@ -319,7 +304,7 @@ impl <'a>Parser<'a>{
                     next_precedence: Some(Precedence::Assignment),
                 }
             },      
-            TokenType::Identifier =>{
+            TokenType::Identifier =>{                
                 ParseRule{
                     prefix: Some(variable),
                     infix: None,
@@ -408,12 +393,63 @@ impl <'a>Parser<'a>{
                     prefix: None,
                     infix: Some(binary),
                 }
-            }   
+            },
+            TokenType::Or => {
+                ParseRule{
+                    precedence: Precedence::Or,
+                    next_precedence: Some(Precedence::And),
+                    prefix: None,
+                    infix: Some(binary),
+                }
+            },
+            TokenType::And => {
+                ParseRule{
+                    precedence: Precedence::And,
+                    next_precedence: Some(Precedence::Equality),
+                    prefix: None,
+                    infix: Some(binary),
+                }
+            },
+            TokenType::Dot => {
+                /*
+                ParseRule{
+                    precedence: Precedence::Call,
+                    next_precedence: Some(Precedence::Primary),
+                    prefix: None,
+                    infix: Some(dot),
+                }
+                */
+                unimplemented!()
+
+            },
+            TokenType::Question => {
+                /*
+                ParseRule{
+                    precedence: Precedence::Assignment,
+                    next_precedence: Some(Precedence::Or),
+                    prefix: None,
+                    infix: Some(question),
+                }
+                */
+                unimplemented!();
+            },
+            
+            TokenType::TokenSelf => {
+                /*
+                ParseRule{
+                    prefix: Some(self),
+                    infix: None,
+                    precedence: Precedence::None,
+                    next_precedence: Some(Precedence::Assignment),
+                }
+                */
+                unimplemented!()
+            }
+            /*
             _ => {
                 eprintln!(" ===> {}",debug::token_type(ttype));
                 unimplemented!()
             }
-            /*
             */
         }
     }
@@ -451,7 +487,7 @@ impl <'a>Parser<'a>{
         self.advance();
         //self.advance();
 
-        while !self.match_token(TokenType::EOF){
+        while !self.match_token(TokenType::EOF) && !self.had_error{
             self.declaration();
         }
                 
@@ -470,7 +506,7 @@ impl <'a>Parser<'a>{
             }
             return None;
         }else{
-            self.emit_byte(Operation::Return);
+            self.emit_byte(Operation::Return(0));
             return self.take_current_function();
         }
     }
@@ -513,16 +549,17 @@ impl <'a>Parser<'a>{
             return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",self.previous.source_text(self.source()) ))
         };
 
-        let mut func = match function(self, &func_name){
+        let func = match function(self, &func_name){
             Some(f)=>f,
             None => return
         };
 
         // Push constant.
-        let i = self.push_to_heap(Box::new(Function::Script(func)));
+        if let Some(i) = self.push_constant(Box::new(Function::Script(*func))){
+            // Register the function
+            self.push_variable(func_name, Value::HeapRef(i));            
+        }
 
-        // Register the function
-        self.push_variable(func_name, Value::HeapRef(i));
     }
 
     /// Compiles a Variable declaration    
@@ -537,7 +574,7 @@ impl <'a>Parser<'a>{
         }else{
             return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",self.previous.source_text(self.source()) ))
         };
-        
+        println!(" ----=+++ {}", var_name);
         self.show_tokens("var_declaration - After getting Var_Name");
 
         // Check if variable is the current scope            
@@ -546,10 +583,6 @@ impl <'a>Parser<'a>{
         }
     
         self.show_tokens("var_declaration - After current scope");
-
-        // All good to go. Create default values
-        let typed = false;        
-        let initialized = false;
 
         
         // Register Variable as NIL... define later
@@ -562,10 +595,15 @@ impl <'a>Parser<'a>{
         self.show_tokens("var_declaration - Before defining");
         // Define it if needed
         if self.match_token(TokenType::Equal){                        
+            // Push the a reference to the variable
+            self.emit_byte(Operation::PushVarRef(self.variables.len()-1));                   
             // Put value of expression on the stack                        
-            self.expression();                        
-            self.emit_byte(Operation::DefineVar(self.variables.len()-1));        
+            self.expression();     
+            // Define
+            self.emit_byte(Operation::DefineVars(1 as usize));        
         }
+
+        self.show_tokens("var_declaration - After defining");
 
         // Check if there is another variable afterwards
         if self.consume(TokenType::Comma) {
@@ -912,6 +950,23 @@ impl <'a>Parser<'a>{
 mod tests {
     use super::*;    
     use crate::vm::VM;
+    use crate::chunk::Chunk;
+    
+
+    impl <'a>Parser<'a> {
+        pub fn chunk(&self)->Option<&Chunk> {
+            if self.current_function.is_none(){
+                // We need this to avoid double borrowing.
+                panic!("No curent function!");
+                //return None
+            }else{
+                match &self.current_function{
+                    Some(f)=>Some(f.chunk()),
+                    None=>None
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_parser_new(){
@@ -1002,26 +1057,33 @@ mod tests {
 
     #[test]
     fn test_add_expression(){
-        let raw_source = "= !( 5 - 4 > 3 * 22 == !false) ".to_string();
+        let raw_source = "let y = !( 5 - 4 > 3 * 22 == !false) ".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut parser = Parser::new(&source);
-        parser.compile();
-        debug::chunk(&parser.chunk().unwrap(), format!("some chunck"));
+        if let Some(f) = parser.compile(){
+            let chunk = f.chunk();
 
-        let mut vm = VM::new();
-        let (code,lines)=parser.chunk().unwrap().to_slices();        
+            debug::chunk(chunk, format!("some chunck"));
 
-        vm.run(code, lines);
-        if let Ok(v) = vm.pop(){
-            if let Value::Bool(b) = v {
-                assert!(b);
+            let mut vm = VM::new();
+            let (code,lines)=chunk.to_slices();        
+    
+            vm.run(code, lines, chunk.constants());            
+
+            if let Ok(v) = vm.pop_var(){
+                if let Value::Bool(b) = v {
+                    assert!(b);
+                }else{
+                    assert!(false);
+                }
             }else{
                 assert!(false);
             }
         }else{
             assert!(false);
         }
+        
     }
 
     #[test]
@@ -1431,14 +1493,17 @@ mod tests {
             debug::chunk(f.chunk(), format!("function expression chunck"));
 
             let ch = f.chunk().code();
-            if let Operation::PushFunction(v) = &ch[1] {
-                match v {
-                    Function::Script(s)=>{
-                        assert_eq!(s.n_args,2);
-                        debug::chunk(s.chunk(), format!("fn {}()", s.name));
+            if let Operation::PushHeapRef(v) = &ch[1] {
+                assert_eq!(*v,0 as usize);                
+                match f.chunk().get_constant(*v){
+                    Some(_s)=>{
+                        
+                        
+                        
                     },
-                    Function::Rust(_)=>assert!(false)
+                    None => {assert!(false)}                    
                 }
+                
             }else {
                 panic!(" Found -> '{}'",&parser.variables[0].to_string())
             }
@@ -1448,7 +1513,7 @@ mod tests {
         
         
     }
-
+    
 
     #[test]
     fn test_function_delaration(){
@@ -1460,10 +1525,57 @@ mod tests {
             assert!(!parser.had_error);
 
             debug::chunk(f.chunk(), format!("function expression chunck"));
+
+            let x = f.chunk().get_constant(0).unwrap()
+                    .as_any()
+                    .downcast_ref::<Function>()
+                    .expect("Wasn't a Function");
+
+            if let Function::Script(s) = x {
+                debug::chunk(s.chunk(), format!("{}", x.to_string()));
+
+            }else{
+                assert!(false);
+            }
+                    
+
         }else{
             assert!(false)
-        }
+        }                        
+
+                        
+    }
+
+    
+
+    #[test]
+    fn test_call(){
+        let raw_source = "fn x(a,b,c) { }\n x()".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);        
+        if let Some(f) = parser.compile(){
+            assert!(!parser.had_error);
+
+            debug::chunk(f.chunk(), format!("main 1 - test call"));
+        }else{
+            assert!(false)
+        }   
         
-                
+        
+        let raw_source = "fn x(a,b,c) { }\n x(1,123,1*2*3)".to_string();
+        let source : Vec<u8> = raw_source.into_bytes();
+
+        let mut parser = Parser::new(&source);        
+        if let Some(f) = parser.compile(){
+            assert!(!parser.had_error);
+            debug::chunk(f.chunk(), format!("main 2 - test call"));
+            
+            // the function x() should be there... nothing else
+            assert_eq!(f.chunk().constants().len(),1);              
+
+        } else {
+            assert!(false)
+        }   
     }
 }

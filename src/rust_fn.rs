@@ -1,6 +1,6 @@
-use crate::handler::Handler;
+use crate::vm::VM;
 
-pub type RustFnType = fn(&mut Handler, usize)->usize;
+pub type RustFnType = fn(&mut VM, usize)->usize;
 
 
 pub struct RustFn {    
@@ -8,8 +8,6 @@ pub struct RustFn {
     pub name : String,
 }
 
-impl RustFn {
-    
+impl RustFn{
     
 }
-

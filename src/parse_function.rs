@@ -30,7 +30,7 @@ pub fn unary(parser: &mut Parser){
     };
 }
 
-pub fn string(parser: &mut Parser){
+pub fn string(_parser: &mut Parser){
     /*
     let v = parser.previous().source_text(parser.source());                
     parser.emit_byte(Operation::PushString(Box::new(v)));
@@ -38,7 +38,7 @@ pub fn string(parser: &mut Parser){
     unimplemented!();
 }
 
-pub fn array(parser: &mut Parser){
+pub fn array(_parser: &mut Parser){
     unimplemented!();
     /*
     //parser.advance();
@@ -79,8 +79,46 @@ pub fn index(_parser: &mut Parser){
     unimplemented!();
 }
 
-pub fn call(_parser:&mut Parser){
-    unimplemented!();
+
+/// pushes arguments separated by commas
+/// e.g. arg1, arg2, arg3,...
+/// 
+fn arg_list(parser: &mut Parser, n: &mut usize){
+    
+   
+    // Left Paren has been consumed
+    loop {
+        
+        // Evaluate an expression
+        parser.expression();
+        // Increase count
+        *n+=1;
+
+        
+        // Consume the next comma, or return
+        if !parser.consume(TokenType::Comma){
+            return;
+        }        
+
+        // start over
+    }
+}
+
+pub fn call(parser:&mut Parser){
+
+    // Push arguments
+    let mut n_args = 0;    
+
+    // If not empty arglist
+    if !parser.check(TokenType::RightParen){
+        arg_list(parser, &mut n_args);    
+    }
+    if !parser.consume(TokenType::RightParen){
+        parser.error_at_current(format!("Expected ')' after argument list in function call"));
+    }
+    
+    parser.emit_byte(Operation::Call(n_args));
+
 }
 
 pub fn grouping(parser: &mut Parser){
@@ -135,6 +173,12 @@ pub fn binary(parser: &mut Parser){
         },
         TokenType::LessEqual => {
             parser.emit_byte(Operation::LessEqual);
+        },
+        TokenType::And => {
+            parser.emit_byte(Operation::And);
+        },
+        TokenType::Or => {
+            parser.emit_byte(Operation::Or);
         },
         _ => parser.internal_error_at_current(format!("Unknown Token for Binary operation"))
     }
@@ -215,26 +259,24 @@ pub fn function(parser:&mut Parser, name: &String)->Option<Box<ScriptFn>>{
 
 /// Anonymous function parser
 pub fn function_value(parser:&mut Parser){
-    match function(parser,&format!("<Anonymous Function>")){
-        Some(f)=>{
-            // f is now the function.
-            let v = Function::Script(f);
-            parser.emit_byte(Operation::PushFunction(v))
-        },
-        None => {}
+    if let Some(f) = function(parser,&format!("<Anonymous Function>")){        
+        // f is now the function.
+        let v = Box::new(Function::Script(*f));
+        if let Some(i) = parser.push_constant(v){                
+            parser.emit_byte(Operation::PushHeapRef(i));
+        }        
     }
 }
 
 pub fn variable( parser: &mut Parser){
     // search back for a variable with the same name
-    let var_name = if parser.consume(TokenType::Identifier){
-        parser.previous().source_text(parser.source())
-    }else{
-        return parser.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",parser.previous().source_text(parser.source()) ))
+    let var_name = match parser.previous().token_type(){
+        TokenType::Identifier => { parser.previous().source_text(parser.source()) },
+        _ =>return parser.error_at_current(format!("Expecting identifier... Found '{}'",parser.previous().source_text(parser.source()) ))        
     };
 
     if let Some(i) = parser.find_var(&var_name) {
-        return parser.emit_byte(Operation::PushVarRef(i));
+        return parser.emit_byte(Operation::EvalVar(i));
     }else{
         return parser.error_at_current(format!("Could not find Variable '{}'", var_name ))
     }

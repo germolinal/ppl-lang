@@ -1,5 +1,6 @@
 use crate::values::Value;
-
+use crate::vm::VM;
+use std::any::Any;
 
 pub trait ValueTrait {
     // Basic i/o
@@ -7,12 +8,18 @@ pub trait ValueTrait {
 
     fn type_name(&self)->String;
 
+    fn as_any(&self) -> &dyn Any;
+
     // Copy and clone
     fn clone_to_value(&self)->Value;
 
+    fn call(&self, _h: &mut VM, _n: usize)->Result<usize,String>{
+        Err(format!("Cannot Call type '{}'... it is not a Function", self.type_name()))
+    }
+
     // Loops.
-    fn get_value(&self, _i: usize)->Result<(Value,Value),String>{
-        Err(format!("Cannot iterate type '{}'", self.type_name()))
+    fn get_next(&self)->Option<(Value,Value)>{
+        None
     }
 
     // Operators

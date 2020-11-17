@@ -1,13 +1,14 @@
 // MINIMUM REQUIREMENTS
 use crate::package::Package;
 use crate::handler::Handler;
+use crate::vm::VM;
 
 use crate::value_trait::ValueTrait;
 
-fn print(handler: &mut Handler, nvars: usize)->usize{
+fn print(vm: &mut VM, nvars: usize)->usize{
     
     for _ in 0..nvars{
-        let v = handler.pop_stack().unwrap();
+        let v = vm.pop().unwrap();
         print!("{} ",v.to_string());
     }
     println!("");

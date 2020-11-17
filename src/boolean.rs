@@ -1,5 +1,6 @@
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
+use std::any::Any;
 
 pub type Boolean = bool;
 
@@ -11,6 +12,10 @@ impl ValueTrait for Boolean {
 
     fn type_name(&self)->String{
         format!("Boolean")
+    }
+
+    fn as_any(&self) -> &dyn Any{
+        self
     }
 
     
