@@ -45,10 +45,10 @@ pub enum TokenType{
 
 #[derive(Clone,Copy)]
 pub struct Token {
-    line: usize,    
-    length: usize,
-    start: usize,   
-    token_type: TokenType 
+    pub line: usize,    
+    pub length: usize,
+    pub start: usize,   
+    pub token_type: TokenType 
 }
 
 impl Token{
@@ -77,22 +77,25 @@ impl Token{
         self.token_type
     }
 
-    pub fn source_text(&self, source: &Vec<u8>)->String{
-
-        // Copy start.
+    pub fn source_slice<'a>(&self, source: &'a Vec<u8>)->&'a [u8]{
         let ini = self.start;
         let fin = self.length + ini;
         match source.get(ini..fin){
-            Some(v)=>{            
-                let mut s : Vec<u8> = Vec::with_capacity(v.len());
-                for b in v.iter(){
-                    s.push(*b);
-                }
+            Some(s)=>s,
+            None => panic!(format!("Could not get slice representing the text of a Token (ini={}, fin={})... out of bounds", ini, fin))
+        }
+    }
 
-                return String::from_utf8(s).unwrap();
-            },
-            None => panic!("Internal error... could not source text for token")
-        }        
+    pub fn source_text(&self, source: &Vec<u8>)->String{
+
+        let v = self.source_slice(source);
+        
+        let mut s : Vec<u8> = Vec::with_capacity(v.len());
+        for b in v.iter(){
+            s.push(*b);
+        }
+
+        return String::from_utf8(s).unwrap();
 
     }
 }

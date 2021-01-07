@@ -17,7 +17,7 @@ pub enum InterpretResult {
 
 pub struct VM {
     stack: Vec<Value>,
-    var_stack: Vec<Value>,        
+    //var_stack: Vec<Value>,        
 }
 
 
@@ -26,7 +26,7 @@ impl VM {
     pub fn new()-> Self{
                     
         Self {
-            var_stack: Vec::with_capacity(1024),
+            //var_stack: Vec::with_capacity(1024),
             stack: Vec::with_capacity(1024),                                    
         }
 
@@ -75,88 +75,31 @@ impl VM {
             match &code[ip] {
                 Operation::Return(n) => {   
                     return InterpretResult::Ok(*n);
-                },
-                /*
-                Operation::Constant(c_index) => {
-                    let c = &chunk.constants()[*c_index];
-                    self.push(*c)                    
-                },
-                */
+                },                
                 Operation::PushBool(v)=>{
                     self.push(Value::Bool(*v))
                 },                
                 Operation::PushNumber(v)=>{
                     self.push(Value::Number(*v))
-                },         
-                /*       
-                Operation::PushString(v)=>{
-                    self.push(Value::StringV( *v ) )
-                },        
-                Operation::PushFunction(v)=>{
-                    self.push(Value::Function( *v ))
-                },     
-                Operation::PushArray(n)=>{
-                    let mut ret = Array::with_capacity(*n);
-                    for i in 0..*n {
-                        if let Ok(v) = self.pop(){
-                            ret[n - 1 -i]=v;
-                        }else{
-                            return InterpretResult::RuntimeError(format!("Ran out of element in stack when building Array of {} elements",n))
-                        }
+                },      
+                Operation::PushNil=>{
+                    self.push(Value::Nil)
+                }                                   
+                Operation::GetLocal(i)=>{  
+                    let local = self.stack[*i];
+                    // Check if it has been initialized
+                    if local.is_nil() {
+                        panic!(format!("Variable '{}' has not been initialized", "TODO: Add &source in GetLocal operation" ));
                     }
-                    self.push(Value::Array( Box::new(ret)) )
+                    // Push it    
+                    self.push(self.stack[*i]);                                                                                                      
+                },
+                Operation::SetLocal(i)=>{      
+                    unimplemented!();                                                                                                            
                 },                
-                Operation::PushObject(v)=>{
-                    self.push(Value::Object( *v ) )
-                },                
-                Operation::PushGeneric(v)=>{
-                    self.push(Value::Generic( *v ))
-                },
-                
-                
-                */
-                Operation::PushVar(v)=>{
-                    // Pushes an object
-                    self.push_var(*v);
-                },
-                Operation::PushVarRef(i)=>{
-                    self.push(Value::VarRef(*i))
-                }
-                
-                Operation::EvalVar(i)=>{                                         
-                    match self.var_stack[*i] {
-                        // Copied.
-                        Value::Nil => self.push(Value::Nil),
-                        Value::Number(v) => self.push(Value::Number(v)),
-                        Value::Bool(v) => self.push(Value::Bool(v)),
-                        /*
-                        Value::Function(_)=> self.push(Value::VarRef(*i)),
-                        Value::Array(v) => {
-                            
-                            self.push(v.clone_to_value());
-                        },
-                        Value::StringV(v) => {
-                            let s = *v.clone();
-                            self.push(Value::StringV(Box::new(s)))
-                        },
-
-                        // Referenced
-                        Value::Object(_)=> self.push(Value::VarRef(*i)),
-                        Value::Generic(_)=> self.push(Value::VarRef(*i)),
-                        */
-                        Value::HeapRef(i) => self.push(Value::HeapRef(i)),
-                        Value::Usize(_)=>panic!("Unexpected behaviour... Trying to Evaluate a usize"),
-                        Value::VarRef(_)=>panic!("Unexpected behaviour... trying to evaluate a VarRef")
-
-
-                    }                                        
-                    
-                },
-                
-
-                Operation::PopVars(n)=>{                    
+                Operation::Pop(n)=>{                    
                     for _ in 0..*n {
-                        self.pop_var().unwrap();                    
+                        self.pop().unwrap();
                     }
                 },
                 
@@ -164,13 +107,15 @@ impl VM {
                     for _ in 0..*n{
                         match self.pop(){
                             Ok(v) => {
+                                unimplemented!();
+                                /*
                                 let length = self.stack.len();
-                                let dest = length-*n;
-                                if let Value::VarRef(i) = self.stack[dest]{
-                                    self.var_stack[i] = v;
+                                let dest = length - *n;
+                                if let Value::VarRef(i) = self.stack[dest]{                                    
                                 }else{
                                     // ignore returned value
                                 }
+                                */
                             },
                             Err(e)=>return InterpretResult::RuntimeError(e.to_string())
                         }
@@ -404,22 +349,27 @@ impl VM {
                 },
                 Operation::JumpBack(n)=>{
                     ip -= n;
-                },    
+                },                    
                 Operation::PushHeapRef(i)=>{
                     self.stack.push(Value::HeapRef(*i))
-                },     
+                },                 
                 Operation::Call(n)=>{
                     let f_ref = self.stack[ self.stack.len() - n - 1 ];
                     if let Value::HeapRef(i) = f_ref {
-                                                
+                                            
+                        unimplemented!();
+                        /*
                         // This will push all the returned values; and on top,
                         // the number of returned values 
                         match constants[i].call(self,*n){
                             Ok(ret_n)=>self.push(Value::Usize(ret_n)),
                             Err(e)=>return InterpretResult::RuntimeError(e)
                         }
+                        */
 
                     }else{
+                        // THis is an error... this is here just to send a 
+                        // better error message
                         match f_ref.call(self,*n){
                             // This should never be successful because all 
                             // objects that can be called as functions 
@@ -442,18 +392,7 @@ impl VM {
         self.stack.push(value);        
     }
 
-    fn push_var(&mut self,var: Value){
-        self.var_stack.push(var);     
-    }
-
-    pub fn pop_var(&mut self)->Result<Value,&str>{        
-        if let Some(v)= self.var_stack.pop(){
-            Ok(v)
-        }else{
-            Err("Trying to pop an empty Var-stack")
-        }   
-    }
-
+        
     pub fn pop(&mut self)->Result<Value,&str>{
         if let Some(v)= self.stack.pop(){
             Ok(v)

@@ -90,6 +90,9 @@ pub mod debug {
             Operation::PushNumber(v)=>{
                 return println!("OP_PUSH_NUMBER | '{}'", v);         
             },
+            Operation::PushNil => {
+                return println!("OP_PUSH_NIL");         
+            },
             /*
             Operation::PushString(v)=>{
                 return println!("OP_PUSH_STRING | '\"{}'\"", v);         
@@ -109,17 +112,14 @@ pub mod debug {
             }
 
 
-            Operation::PushVar(_)=>{
-                return println!("OP_PUSH_VAR");
+            Operation::GetLocal(i)=>{
+                return println!("OP_GET_LOCAL | {}",i);
             },
-            Operation::PushVarRef(i)=>{
-                return println!("OP_PUSH_VAR_REF | {}", i);
+            Operation::SetLocal(i)=>{
+                return println!("OP_SET_LOCAL | {}",i);
             },
-            Operation::EvalVar(i)=>{
-                return println!("OP_EVAL_VAR | {}", i);
-            },
-            Operation::PopVars(n)=>{
-                return println!("OP_POP_VARS | {}",n);
+            Operation::Pop(n)=>{
+                return println!("OP_POP | {}",n);
             },
             Operation::DefineVars(n)=>{
                 return println!("OP_DEFINE_VARS | {}",n);

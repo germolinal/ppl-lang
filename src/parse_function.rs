@@ -4,17 +4,18 @@ use crate::token::*;
 use crate::operations::*;
 use crate::script_fn::ScriptFn;
 use crate::function::Function;
+use crate::compiler::Compiler;
 
 /* PARSING FUNCTIONS */
 
 
-pub fn unary(parser: &mut Parser){
+pub fn unary(parser: &mut Parser, compiler: &mut Compiler){
         
     // Get the unary Token
     let token_type = parser.previous().token_type();
 
     // Consume the expresion after
-    parser.parse_precedence(Precedence::Unary);
+    parser.parse_precedence(compiler, Precedence::Unary);
 
     // Emit the operation
     match token_type{
@@ -30,7 +31,7 @@ pub fn unary(parser: &mut Parser){
     };
 }
 
-pub fn string(_parser: &mut Parser){
+pub fn string(_parser: &mut Parser, _c: &mut Compiler){
     /*
     let v = parser.previous().source_text(parser.source());                
     parser.emit_byte(Operation::PushString(Box::new(v)));
@@ -38,7 +39,7 @@ pub fn string(_parser: &mut Parser){
     unimplemented!();
 }
 
-pub fn array(_parser: &mut Parser){
+pub fn array(_parser: &mut Parser, _c: &mut Compiler){
     unimplemented!();
     /*
     //parser.advance();
@@ -62,7 +63,7 @@ pub fn array(_parser: &mut Parser){
     */
 }
 
-pub fn number(parser: &mut Parser){
+pub fn number(parser: &mut Parser, _c: &mut Compiler){
     let v = parser.previous().source_text(parser.source());            
     let the_v = match v.parse::<f64>(){
         Ok(v)=>v,
@@ -75,7 +76,7 @@ pub fn number(parser: &mut Parser){
 
 
 
-pub fn index(_parser: &mut Parser){
+pub fn index(_parser: &mut Parser, _c: &mut Compiler){
     unimplemented!();
 }
 
@@ -83,14 +84,14 @@ pub fn index(_parser: &mut Parser){
 /// pushes arguments separated by commas
 /// e.g. arg1, arg2, arg3,...
 /// 
-fn arg_list(parser: &mut Parser, n: &mut usize){
+fn arg_list(parser: &mut Parser, compiler: &mut Compiler, n: &mut usize){
     
    
     // Left Paren has been consumed
     loop {
         
         // Evaluate an expression
-        parser.expression();
+        parser.expression(compiler);
         // Increase count
         *n+=1;
 
@@ -104,14 +105,14 @@ fn arg_list(parser: &mut Parser, n: &mut usize){
     }
 }
 
-pub fn call(parser:&mut Parser){
+pub fn call(parser:&mut Parser, compiler: &mut Compiler){
 
     // Push arguments
     let mut n_args = 0;    
 
     // If not empty arglist
     if !parser.check(TokenType::RightParen){
-        arg_list(parser, &mut n_args);    
+        arg_list(parser, compiler, &mut n_args);    
     }
     if !parser.consume(TokenType::RightParen){
         parser.error_at_current(format!("Expected ')' after argument list in function call"));
@@ -121,23 +122,23 @@ pub fn call(parser:&mut Parser){
 
 }
 
-pub fn grouping(parser: &mut Parser){
+pub fn grouping(parser: &mut Parser, compiler: &mut Compiler){
     // left paren has been consumed
-    parser.expression();
+    parser.expression(compiler);
     if !parser.consume(TokenType::RightParen) {
         parser.error_at_current(format!("Expected ')' after expression"));
     }
 }
 
 
-pub fn binary(parser: &mut Parser){
+pub fn binary(parser: &mut Parser, compiler: &mut Compiler){
     // Get the Binary
     let operator_type = parser.previous().token_type();
 
     // Compile what is after
     let rule = parser.get_rule(operator_type);
     match rule.next_precedence{
-        Some(p)=>parser.parse_precedence(p),
+        Some(precedence)=>parser.parse_precedence(compiler, precedence),
         None => parser.internal_error_at_current(format!("No next precedence found for binary operation"))
     }
 
@@ -185,7 +186,7 @@ pub fn binary(parser: &mut Parser){
     
 }
 
-pub fn literal(parser: &mut Parser){
+pub fn literal(parser: &mut Parser, _c: &mut Compiler){
     match parser.previous().token_type(){
         TokenType::False => parser.emit_byte(Operation::PushBool(false)),
         TokenType::True => parser.emit_byte(Operation::PushBool(true)),        
@@ -193,7 +194,8 @@ pub fn literal(parser: &mut Parser){
     }
 }
 
-pub fn function(parser:&mut Parser, name: &String)->Option<Box<ScriptFn>>{
+/// Parses an anonymous function
+pub fn function(parser:&mut Parser, name: &String, compiler: &mut Compiler)->Option<Box<ScriptFn>>{
     // starts from the (), so it covers
     // both fn(){} and fn ID(){}
     // this becomes { let args[]; ...body...  }
@@ -218,10 +220,10 @@ pub fn function(parser:&mut Parser, name: &String)->Option<Box<ScriptFn>>{
     parser.set_function(new_func); 
 
     // Open main scope
-    parser.begin_scope();
+    parser.begin_scope(compiler);
 
     let mut n_vars : usize = 0;
-    parser.var_declaration(&mut n_vars);
+    parser.var_declaration(compiler, &mut n_vars);
     if !parser.consume(TokenType::RightParen){
         parser.error_at_current(format!("Expecting ')' after variable list in function declaration"));        
         return None;
@@ -234,10 +236,10 @@ pub fn function(parser:&mut Parser, name: &String)->Option<Box<ScriptFn>>{
     }
 
     // Open, process, and close body    
-    parser.block();
+    parser.block(compiler);
     
     // Close main scope
-    parser.end_scope();
+    parser.end_scope(compiler);
 
     parser.show_tokens("function()  2");
 
@@ -258,8 +260,9 @@ pub fn function(parser:&mut Parser, name: &String)->Option<Box<ScriptFn>>{
 }
 
 /// Anonymous function parser
-pub fn function_value(parser:&mut Parser){
-    if let Some(f) = function(parser,&format!("<Anonymous Function>")){        
+pub fn function_value(parser:&mut Parser, compiler: &mut Compiler){
+    
+    if let Some(f) = function(parser,&format!("<Anonymous Function>"), compiler){        
         // f is now the function.
         let v = Box::new(Function::Script(*f));
         if let Some(i) = parser.push_constant(v){                
@@ -268,17 +271,18 @@ pub fn function_value(parser:&mut Parser){
     }
 }
 
-pub fn variable( parser: &mut Parser){
-    // search back for a variable with the same name
-    let var_name = match parser.previous().token_type(){
-        TokenType::Identifier => { parser.previous().source_text(parser.source()) },
-        _ =>return parser.error_at_current(format!("Expecting identifier... Found '{}'",parser.previous().source_text(parser.source()) ))        
-    };
 
-    if let Some(i) = parser.find_var(&var_name) {
-        return parser.emit_byte(Operation::EvalVar(i));
-    }else{
-        return parser.error_at_current(format!("Could not find Variable '{}'", var_name ))
+pub fn variable( parser: &mut Parser, compiler: &mut Compiler){
+    // search back for a variable with the same name
+    let var_name = parser.previous();
+        
+    match compiler.get_local(&var_name, parser.source()){
+        Some(i)=>{
+            parser.emit_byte(Operation::GetLocal(i))
+        },
+        None => parser.error_at_current(format!("Could not find Variable '{}'", var_name.source_text(parser.source() )))
     }
+        
 }
+
 

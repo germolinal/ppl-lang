@@ -26,22 +26,17 @@ pub enum Operation {
     LessEqual,
     And,
     Or,
-    //Constant(usize),    
+        
+    PushNil,
     PushBool(bool),
     PushNumber(f64),  
-
     PushHeapRef(usize),
-    PushVarRef(usize),
-    EvalVar(usize),
-    //PushFunction(Function),
-    //PushString(Box<StringV>),
-    //PushArray(usize), // the length of the array
-    //PushObject(Box<Object>),
-    //PushGeneric(Box<dyn ValueTrait>),
+    
+    GetLocal(usize),
+    SetLocal(usize),
 
-    PopVars(usize),
+    Pop(usize),
     DefineVars(usize),
-    PushVar(Value),
     
     ForLoop(usize,usize),
     JumpIfFalse(usize),

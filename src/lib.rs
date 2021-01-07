@@ -1,3 +1,4 @@
+mod options;
 
 mod values;
 mod value_trait;
@@ -24,6 +25,4 @@ mod parser;
 mod vm;
 
 mod package;
-
-pub mod handler;
-pub mod io;
+mod compiler;

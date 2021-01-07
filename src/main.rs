@@ -2,9 +2,9 @@ extern crate ppl_lib;
 use std::env;
 use std::fs;
 
-use ppl_lib::handler::Handler;
+//use ppl_lib::handler::Handler;
 // Packages
-use ppl_lib::io::register_io_package;
+//use ppl_lib::io::register_io_package;
 
 
 
@@ -19,16 +19,16 @@ pub fn main(){
         let filename = &args[1];
         let script = fs::read(filename).unwrap();
     
-        let mut handler = Handler::new(&script);
+        //let mut handler = Handler::new(&script);
         
         // Reguster packages
-        register_io_package(&mut handler);
+        //register_io_package(&mut handler);
     
         //    println!("Searching for {}", query);
         println!("In file {}", filename);
 
         // Run file
-        handler.run();
+        //handler.run();
 
     }else{
         panic!("A script File is required")
