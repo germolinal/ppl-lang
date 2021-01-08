@@ -4,11 +4,8 @@ use crate::token::*;
 use crate::operations::*;
 use crate::function::Function;
 use crate::compiler::Compiler;
-use std::rc::Rc;
 
 /* PARSING FUNCTIONS */
-
-
 pub fn unary(parser: &mut Parser, compiler: &mut Compiler){
         
     // Get the unary Token
@@ -296,7 +293,7 @@ pub fn variable( parser: &mut Parser, compiler: &mut Compiler){
         Some(i)=>{
             parser.emit_byte(Operation::GetLocal(i))
         },
-        None => parser.error_at_current(format!("Could not find Variable '{}'", var_name.source_text(parser.source() )))
+        None => panic!("Could not find Variable '{}'", var_name.source_text(parser.source() ))
     }
         
 }

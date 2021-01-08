@@ -5,9 +5,8 @@ use crate::native_fn::NativeFn;
 use crate::script_fn::ScriptFn;
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
-use crate::vm::{VM, InterpretResult};
 use crate::chunk::Chunk;
-
+use crate::vm::VM;
 
 pub enum Function{
     Native(Rc<NativeFn>),
@@ -117,13 +116,15 @@ impl ValueTrait for Function {
         // Call
 
         match self {
-            Function::Script(f) => {
+            Function::Script(_) => {
                 unimplemented!();
-                if let InterpretResult::Ok(n) = vm.run(f.chunk().heap()){                    
+                /*
+                if let InterpretResult::Ok(n) = vm.run(){                    
                     return Ok(n);
                 }else{
                     return Err(format!("Error when running function '{}'", f.name));
                 }
+                */
             },
             Function::Native(f)=>{
                 // Get the function

@@ -19,8 +19,9 @@ mod token;
 mod parse_function;
 
 mod parser;
-mod vm;
 
 mod package;
-mod compiler;
-mod call_frame;
+
+pub mod call_frame;
+pub mod vm;
+pub mod compiler;

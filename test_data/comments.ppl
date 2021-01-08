@@ -1,0 +1,11 @@
+// Comment 1... this will be ignored.
+
+let some_literal = 1
+
+/* this is a 
+messy block comment 
+===
+*/
+  
+let other_literal = 21
+

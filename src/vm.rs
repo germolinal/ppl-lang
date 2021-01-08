@@ -2,7 +2,6 @@
 use crate::operations::*;
 use crate::values::*;
 use crate::value_trait::ValueTrait;
-//use crate::array::Array;
 use crate::call_frame::CallFrame;
 use crate::function::Function;
 
@@ -10,8 +9,7 @@ use crate::function::Function;
 use crate::debug::*;
 
 pub enum InterpretResult {
-    Ok(usize),
-    //CompileError(String),
+    Ok(usize),    
     RuntimeError(String),
 }
 
@@ -49,18 +47,19 @@ impl VM {
     
     
     /// Runs the last CallFrame in the call_stack
-    pub fn run(&mut self, /*code: &[Operation], lines: &[usize], */ constants: &Vec<Box<dyn ValueTrait>>) -> InterpretResult {
+    pub fn run( &mut self ) -> InterpretResult {
                 
         
         let frame_n = self.call_frames.len() - 1;
         let first_call_frame_slot = self.call_frames[frame_n].first_slot();
-        let ip = self.call_frames[frame_n].ip();
-
+        
         loop {          
+            let ip = self.call_frames[frame_n].ip();
 
-            if ip >= self.call_frames[frame_n].n_operations().unwrap(){
+            if ip >= self.call_frames[frame_n].n_operations().unwrap(){                
                 break;
             }   
+            println!("IP == {}", ip);
             /*****************************/
             /* Dissassemble when developing */
             /*****************************/
@@ -88,7 +87,7 @@ impl VM {
                 Operation::Return(n) => {   
                     
                     // Go back one call_frame
-                    self.pop_call_frame();
+                    self.pop_call_frame().unwrap();
                     if self.call_frames.len() == 0 {
                         return InterpretResult::Ok(n);    
                     }
@@ -127,7 +126,7 @@ impl VM {
                 Operation::DefineVars(n)=>{
                     for _ in 0..n{
                         match self.pop(){
-                            Ok(v) => {
+                            Ok(_v) => {
                                 unimplemented!();
                                 /*
                                 let length = self.stack.len();
@@ -297,8 +296,9 @@ impl VM {
                     }
                 },
 
-                Operation::ForLoop(n_vars, body_length)=>{
-
+                Operation::ForLoop(_n_vars, _body_length)=>{
+                    unimplemented!();
+                    /*                
                     let range = self.pop().unwrap();
                     let mut first_iter = true;
                     // Check number of variables
@@ -334,10 +334,9 @@ impl VM {
                         }
 
                         // Run body... lets do this:
-                        let ini = ip;
-                        let fin = ip + body_length;   
-                        unimplemented!();     
-                        /*                
+                        let _ini = ip;
+                        let _fin = ip + body_length;   
+                             
                         let sub_code = &code[ini..fin];
                         let sub_lines = &lines[ini..fin];
                         match self.run(sub_code, sub_lines, constants){
@@ -345,11 +344,11 @@ impl VM {
                             InterpretResult::RuntimeError(e) => return InterpretResult::RuntimeError(e),
                             //InterpretResult::CompileError(e) => return InterpretResult::CompileError(e),
                         };    
-                        */                                            
                     }
-
+                    
                     // Skip the whole length of the body
                     self.call_frames[frame_n].jump_forward(body_length);
+                    */                                            
 
                 },// End of for_loop operation
                 Operation::JumpIfFalse(n)=>{                    
@@ -553,7 +552,7 @@ mod tests {
         vm.push_call_frame(CallFrame::new(0, function.clone_rc() ));
         
         //let c = function.chunk().unwrap();
-        assert!(vm.run(&vec![]).is_ok()); 
+        assert!(vm.run().is_ok()); 
 
         let v2 = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(v2,-v);
@@ -579,7 +578,7 @@ mod tests {
                 
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&vec![]).is_ok());
+        assert!(!vm.run().is_ok());
         
                     
 
@@ -596,7 +595,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&vec![]).is_ok());
+        assert!(vm.run().is_ok());
                         
         
     }
@@ -622,7 +621,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&vec![]).is_ok());                                
+        assert!(vm.run().is_ok());                                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a+b,c);
@@ -644,7 +643,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&vec![]).is_ok());                             
+        assert!(!vm.run().is_ok());                             
 
     }
 
@@ -667,7 +666,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&vec![]).is_ok());                              
+        assert!(vm.run().is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a-b,c);
@@ -694,7 +693,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run( &vec![] ).is_ok());                             
+        assert!(!vm.run().is_ok());                             
     }
 
     #[test]
@@ -719,7 +718,7 @@ mod tests {
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
 
-        assert!(vm.run( &vec![]).is_ok());                
+        assert!(vm.run().is_ok());                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a*b,c);
@@ -742,7 +741,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));                
-        assert!(!vm.run(&vec![]).is_ok());                              
+        assert!(!vm.run().is_ok());                              
 
     }
 
@@ -767,7 +766,7 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run( &vec![]).is_ok());                              
+        assert!(vm.run().is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a / b,c);
@@ -790,6 +789,6 @@ mod tests {
         
         let mut vm = VM::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&vec![]).is_ok());                                
+        assert!(!vm.run().is_ok());                                
     }
 }

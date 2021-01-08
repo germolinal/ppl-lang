@@ -1,6 +1,5 @@
 use crate::function::Function;
 use crate::operations::Operation;
-use std::rc::Rc;
 
 pub struct CallFrame{
     function: Function,

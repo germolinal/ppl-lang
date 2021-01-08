@@ -126,7 +126,7 @@ impl <'a>Scanner<'a> {
         }
 
         loop {            
-            
+                        
             match self.peek(){
                 ' '  => {self.advance().unwrap();},
                 '\r' => {self.advance().unwrap();},
@@ -140,30 +140,30 @@ impl <'a>Scanner<'a> {
                         // Single line comment
                         while self.peek() != '\n' && !self.finished {
                             self.advance().unwrap();
-                        }
-
+                        }                                   
                     }else if self.peek_next() == '*'{
                         // Consume slash and star
-                        self.advance();
-                        self.advance();
+                        self.advance().unwrap();
+                        self.advance().unwrap();
                         // Block comment
                         loop {                                
                             // Check if it is end
-                            if self.finished{                                    
+                            if self.finished {                                 
                                 return;
                             }
 
-                            // Check if end of blovk comment
-                            if self.peek() == '*' && self.peek_next() == '/' {                                    
+                            // Check if end of block comment
+                            if self.peek() == '*' && self.peek_next() == '/' {                                                                    
                                 // Consume slash and star
-                                self.advance();
-                                self.advance();
-                                return;
+                                self.advance().unwrap();
+                                self.advance().unwrap();                                                                                                
+                                break; // get out of the block comment loop                                
+                                
                             }
                             match self.advance().unwrap(){
                                 '\n' => {
                                     self.line += 1;
-                                    self.advance().unwrap();
+                                    //self.advance().unwrap();
                                 },
                                 _ =>{}
                             };
@@ -363,9 +363,8 @@ impl <'a>Scanner<'a> {
     }
 
     pub fn scan_token(&mut self) -> Token {
-        self.skip_white_space();
-
-        //self.start = self.current.clone();        
+        self.skip_white_space();        
+        
         self.start_index = self.current_index;
                 
         let c = match self.advance(){
@@ -373,7 +372,6 @@ impl <'a>Scanner<'a> {
             None=> return Token::new(self, TokenType::EOF)
         };
         
-
         // Alphabetic or underscore allowed
         if c.is_ascii_alphabetic() || c == '_'{
             return self.identifier();
@@ -504,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_single_character(){
+    fn test_scan_empty_string(){
         
         let raw_source = "".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
@@ -519,7 +517,10 @@ mod tests {
             },
             _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
+    }
 
+    #[test]
+    fn test_scan_single_character(){
         // 
         let raw_source = "(){},.-+*/".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
@@ -907,6 +908,7 @@ mod tests {
 
     }// end of test_scan_string()
 
+
     #[test]
     fn test_scan_int(){
         let s = 123;
@@ -1254,7 +1256,7 @@ mod tests {
             },
             _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
-        //e3lements
+        //elements
         let token = scanner.scan_token();
         match token.token_type() {
             TokenType::Identifier => {                                
@@ -1269,11 +1271,91 @@ mod tests {
             },
             _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
         };
+    }
 
 
+    
+    use std::fs;        
+    #[test]
+    fn test_comments_ppl_file(){
+        //let path = env::current_dir().unwrap();
+        //println!("The current directory is {}", path.display());
 
+        let filename = "./test_data/comments.ppl";
+        let source = fs::read(&format!("{}",filename)).unwrap();
+        let mut scanner = Scanner::new(&source);
+
+        // Let
+        let token = scanner.scan_token();        
+        match token.token_type() {
+            TokenType::Let => {},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // some_literal
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Identifier => {
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // =
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Equal => {
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // 1
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Number => {
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // Let
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Let => {},
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // other_literal
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Identifier => {
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // =
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Equal => {
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
+
+        // 21
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Number => {
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token, &source))},
+        };
 
     }
+    
+
 
 
 }// End test module

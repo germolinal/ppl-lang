@@ -1,16 +1,12 @@
-use std::rc::Rc;
 
 use crate::debug::*;
 use crate::scanner::*;
-//use crate::operations::*;
 use crate::token::*;
-//use crate::chunk::*;
 use crate::parse_function::*;
 use crate::function::Function;
 use crate::value_trait::ValueTrait;
 use crate::operations::Operation;
 use crate::compiler::Compiler;
-//use crate::package::Packages;
 
 #[repr(u8)] 
 #[derive(PartialEq,PartialOrd)]
@@ -1107,7 +1103,7 @@ mod tests {
             let mut vm = VM::new();   
 
             vm.push_call_frame(CallFrame::new(0,f.clone_rc()));
-            vm.run(&vec![]);            
+            vm.run();            
 
             
             

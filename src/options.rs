@@ -1,5 +1,5 @@
 
-pub type Options<T : PartialEq> = Vec<T>;
+pub type Options<T> = Vec<T>;
 
 
 /***********/
@@ -11,8 +11,8 @@ mod tests {
     use super::*;    
     use crate::compiler::CompilerOptions;
     
-
     
+
     #[test]
     fn test_compiler_options(){
         let mut o : Options<CompilerOptions> = vec![];
@@ -22,7 +22,5 @@ mod tests {
         o.push(CompilerOptions::Optimize);
         assert!( o.contains( &CompilerOptions::Optimize ));
     }
-
-    
 
 }

@@ -1,11 +1,3 @@
-//use crate::variable::Var;
-//use std::rc::Rc;
-
-//use crate::value_trait::ValueTrait;
-//use crate::string::StringV;
-//use crate::object::Object;
-//use crate::function::Function;
-use crate::values::Value;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
