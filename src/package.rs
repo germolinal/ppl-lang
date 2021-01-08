@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-
+use std::rc::Rc;
 
 use crate::function::Function;
-use crate::rust_fn::*;
+use crate::native_fn::{NativeFn, NativeFnType};
 
 pub struct Package {
     functions: HashMap<String,Function>,
@@ -19,14 +19,14 @@ impl Package{
         }
     }
 
-    pub fn register_rust_func(&mut self, name: &str, func: RustFnType )->Result<(),String> {
+    pub fn register_rust_func(&mut self, name: &str, func: NativeFnType )->Result<(),String> {
         
-        let rust_fn = RustFn {
+        let native_fn = NativeFn {
             name: name.to_string(),
             func: func
         };
         
-        let function: Function = Function::Rust(rust_fn);
+        let function: Function = Function::Native(Rc::new(native_fn));
 
         self.register_func(function)
     }  

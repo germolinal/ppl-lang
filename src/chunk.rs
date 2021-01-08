@@ -12,7 +12,7 @@ pub struct Chunk {
     code : Vec<Operation>,
 
     /// The values contained in the code
-    constants : Vec<Box<dyn ValueTrait>>,
+    heap : Vec<Box<dyn ValueTrait>>,
 
     /// The lines at which each instruction was created
     lines : Vec<usize>,
@@ -43,7 +43,7 @@ impl Chunk {
     pub fn new()->Self{
         Self{
             code: Vec::with_capacity(1024),
-            constants: Vec::with_capacity(1024),
+            heap: Vec::with_capacity(1024),
             lines: Vec::with_capacity(1024),
         }
     }
@@ -58,10 +58,12 @@ impl Chunk {
     }
 
     pub fn get_constant(&self, i: usize)->Option<&Box<dyn ValueTrait>>{
-        self.constants.get(i)
+        self.heap.get(i)
     }
     
-
+    pub fn n_operations(&self)->usize{
+        self.code.len()
+    }
     
     pub fn lines(&self)->&Vec<usize>{
         &self.lines
@@ -97,16 +99,16 @@ impl Chunk {
     /// # Arguments
     /// * v: the value to add    
     pub fn push_constant(&mut self, v : Box<dyn ValueTrait>)-> usize {
-        if self.constants.len() >= self.constants.capacity() {
-            panic!("The max number of constants in chunk ({}) has been exceeded", self.constants.capacity());
+        if self.heap.len() >= self.heap.capacity() {
+            panic!("The max number of elements in the heap of a Chunk ({}) has been exceeded", self.heap.capacity());
         }
 
-        self.constants.push(v);        
-        self.constants.len()-1// as u8;
+        self.heap.push(v);        
+        self.heap.len()-1// as u8;
     }
 
-    pub fn constants(&self)->&Vec<Box<dyn ValueTrait>>{
-        &self.constants
+    pub fn heap(&self)->&Vec<Box<dyn ValueTrait>>{
+        &self.heap
     }
     
 
@@ -125,7 +127,7 @@ mod tests {
     fn test_new() {
         let c = Chunk::new();        
         assert_eq!(0, c.code.len());
-        //assert_eq!(0, c.constants.len());        
+        //assert_eq!(0, c.heap.len());        
     }
 
     #[test]
@@ -144,7 +146,7 @@ mod tests {
         let mut c = Chunk::new();
         let i = c.add_constant(Value::new_number(v));
 
-        let found = c.constants[0];
+        let found = c.heap[0];
         assert_eq!(v,found.unrwap_number().unwrap());
         assert_eq!(i,0);
         
@@ -152,7 +154,7 @@ mod tests {
 
         let i = c.add_constant(Value::new_number(2.0*v));
 
-        let found = c.constants[1];
+        let found = c.heap[1];
         assert_eq!(v*2.0,found.unrwap_number().unwrap());
         assert_eq!(i,1);
         

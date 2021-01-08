@@ -3,6 +3,8 @@ use crate::operations::*;
 use crate::values::*;
 use crate::value_trait::ValueTrait;
 //use crate::array::Array;
+use crate::call_frame::CallFrame;
+use crate::function::Function;
 
 #[cfg(debug_assertions)]
 use crate::debug::*;
@@ -16,8 +18,8 @@ pub enum InterpretResult {
 
 
 pub struct VM {
-    stack: Vec<Value>,
-    //var_stack: Vec<Value>,        
+    call_frames: Vec<CallFrame>,
+    stack: Vec<Value>,    
 }
 
 
@@ -27,6 +29,7 @@ impl VM {
                     
         Self {
             //var_stack: Vec::with_capacity(1024),
+            call_frames: Vec::with_capacity(64),
             stack: Vec::with_capacity(1024),                                    
         }
 
@@ -44,12 +47,18 @@ impl VM {
     }
     */
     
-    pub fn run(&mut self, code: &[Operation], lines: &[usize], constants: &Vec<Box<dyn ValueTrait>>) -> InterpretResult {
-               
-        let mut ip = 0;
-        loop{          
+    
+    /// Runs the last CallFrame in the call_stack
+    pub fn run(&mut self, /*code: &[Operation], lines: &[usize], */ constants: &Vec<Box<dyn ValueTrait>>) -> InterpretResult {
+                
+        
+        let frame_n = self.call_frames.len() - 1;
+        let first_call_frame_slot = self.call_frames[frame_n].first_slot();
+        let ip = self.call_frames[frame_n].ip();
 
-            if ip >= code.len(){
+        loop {          
+
+            if ip >= self.call_frames[frame_n].n_operations().unwrap(){
                 break;
             }   
             /*****************************/
@@ -65,46 +74,58 @@ impl VM {
                 }
                 print!("]\n");
 
-                // Report operation                
+                // Report operation 
+                let (code,lines) = self.call_frames[frame_n].code_lines().unwrap();               
                 debug::operation(code, lines, ip);                
             }
             /*****************************/
             /*****************************/
             /*****************************/
 
-            match &code[ip] {
+            let (current_operation, _)=self.call_frames[frame_n].current_instruction_and_line().unwrap();
+            
+            match current_operation {
                 Operation::Return(n) => {   
-                    return InterpretResult::Ok(*n);
+                    
+                    // Go back one call_frame
+                    self.pop_call_frame();
+                    if self.call_frames.len() == 0 {
+                        return InterpretResult::Ok(n);    
+                    }
+
+                    return InterpretResult::Ok(n);
                 },                
                 Operation::PushBool(v)=>{
-                    self.push(Value::Bool(*v))
+                    self.push(Value::Bool(v))
                 },                
                 Operation::PushNumber(v)=>{
-                    self.push(Value::Number(*v))
+                    self.push(Value::Number(v))
                 },      
                 Operation::PushNil=>{
                     self.push(Value::Nil)
                 }                                   
                 Operation::GetLocal(i)=>{  
-                    let local = self.stack[*i];
+                    let absolute_position = i + first_call_frame_slot;
+                    let local = self.stack[absolute_position];
                     // Check if it has been initialized
                     if local.is_nil() {
                         panic!(format!("Variable '{}' has not been initialized", "TODO: Add &source in GetLocal operation" ));
                     }
                     // Push it    
-                    self.push(self.stack[*i]);                                                                                                      
+                    self.push(self.stack[absolute_position]);                                                                                                      
                 },
                 Operation::SetLocal(i)=>{      
-                    unimplemented!();                                                                                                            
+                    let absolute_position = i + first_call_frame_slot;
+                    self.stack[absolute_position] = self.pop().unwrap();                                                                                                                 
                 },                
                 Operation::Pop(n)=>{                    
-                    for _ in 0..*n {
+                    for _ in 0..n {
                         self.pop().unwrap();
                     }
                 },
                 
                 Operation::DefineVars(n)=>{
-                    for _ in 0..*n{
+                    for _ in 0..n{
                         match self.pop(){
                             Ok(v) => {
                                 unimplemented!();
@@ -281,7 +302,7 @@ impl VM {
                     let range = self.pop().unwrap();
                     let mut first_iter = true;
                     // Check number of variables
-                    if *n_vars > 2 || *n_vars == 0 {
+                    if n_vars > 2 || n_vars == 0 {
                         return InterpretResult::RuntimeError(format!("1 or 2 variables should be defined within a For loop: {} were given",n_vars));
                     }
                     // Loop
@@ -308,30 +329,35 @@ impl VM {
                         // Not finished... push variables, these
                         // should be evaluated within the body loop
                         self.push(var1);
-                        if *n_vars == 2 {                            
+                        if n_vars == 2 {                            
                             self.push(var2);
                         }
 
                         // Run body... lets do this:
                         let ini = ip;
-                        let fin = ip + body_length;                        
+                        let fin = ip + body_length;   
+                        unimplemented!();     
+                        /*                
                         let sub_code = &code[ini..fin];
                         let sub_lines = &lines[ini..fin];
                         match self.run(sub_code, sub_lines, constants){
                             InterpretResult::Ok(_) => {},
                             InterpretResult::RuntimeError(e) => return InterpretResult::RuntimeError(e),
                             //InterpretResult::CompileError(e) => return InterpretResult::CompileError(e),
-                        };                                                
+                        };    
+                        */                                            
                     }
 
                     // Skip the whole length of the body
-                    ip += body_length;
+                    self.call_frames[frame_n].jump_forward(body_length);
+
                 },// End of for_loop operation
-                Operation::JumpIfFalse(n)=>{
+                Operation::JumpIfFalse(n)=>{                    
+
                     let value = self.pop().unwrap();
                     if let Value::Bool(v) = value {
-                        if !v {
-                            ip += n;
+                        if !v {                            
+                            self.call_frames[frame_n].jump_forward(n);
                         }
                     }else{
                         return InterpretResult::RuntimeError(format!("Expression in while loop ( while EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
@@ -340,23 +366,41 @@ impl VM {
                 Operation::JumpIfTrue(n)=>{
                     let value = self.pop().unwrap();
                     if let Value::Bool(v) = value {
-                        if v {
-                            ip += n;
+                        if v {                            
+                            self.call_frames[frame_n].jump_forward(n);
                         }
                     }else{
                         return InterpretResult::RuntimeError(format!("Expression in while loop ( while EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
                     }
                 },
-                Operation::JumpBack(n)=>{
-                    ip -= n;
+                Operation::JumpBack(n)=>{                    
+                    self.call_frames[frame_n].jump_backwards(n);
                 },                    
                 Operation::PushHeapRef(i)=>{
-                    self.stack.push(Value::HeapRef(*i))
+                    self.stack.push(Value::HeapRef(i))
                 },                 
-                Operation::Call(n)=>{
-                    let f_ref = self.stack[ self.stack.len() - n - 1 ];
+                Operation::Call(n_vars)=>{
+                    let f_ref = self.stack[ self.stack.len() - n_vars - 1 ];
                     if let Value::HeapRef(i) = f_ref {
-                                            
+                                         
+                        // get the function from the surrounding function (i.e. the current one)
+                        let chunk = self.call_frames[frame_n]
+                                        .function()
+                                        .chunk()
+                                        .unwrap();
+                        
+                        let function = match chunk.get_constant(i)
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<Function>(){
+                                Some(f)=>f.clone_rc(),
+                                None => return InterpretResult::RuntimeError(format!("Trying to call from a '{}' object as if it was a function", chunk.get_constant(i).unwrap().type_name()))
+                            };
+
+                        // Add the function to the stack, and continue 
+                        // in business as usual.                                         
+                        self.push_call_frame(CallFrame::new(0,function));
+
                         unimplemented!();
                         /*
                         // This will push all the returned values; and on top,
@@ -370,7 +414,7 @@ impl VM {
                     }else{
                         // THis is an error... this is here just to send a 
                         // better error message
-                        match f_ref.call(self,*n){
+                        match f_ref.call(self,n_vars){
                             // This should never be successful because all 
                             // objects that can be called as functions 
                             // are in the heap (thus, HeapRef)
@@ -381,7 +425,10 @@ impl VM {
                 }    
 
             }// end of match
-            ip += 1;
+
+            // Advance one space
+            self.call_frames[frame_n].jump_forward(1);
+
         }// end of loop.
 
         return InterpretResult::RuntimeError("No RETURN operation found".to_string());
@@ -390,6 +437,18 @@ impl VM {
 
     pub fn push(&mut self, value: Value ) {        
         self.stack.push(value);        
+    }
+
+    pub fn push_call_frame(&mut self, call_frame: CallFrame ) {        
+        self.call_frames.push(call_frame);        
+    }
+
+    pub fn pop_call_frame(&mut self) ->Result<CallFrame, &str> {        
+        if let Some(v) = self.call_frames.pop(){
+            Ok(v)
+        }else{
+            Err("Trying to pop an empty CallFrame stack")
+        }
     }
 
         
@@ -411,8 +470,7 @@ impl VM {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::chunk::*;
+    use super::*;    
 
     impl InterpretResult {
         pub fn is_ok(&self)->bool{
@@ -476,19 +534,26 @@ mod tests {
     }
     */
 
+    use crate::function::Function;
     #[test]
     fn test_negate(){
         
-        // Over a number... should work
-        let v = 1.2;
-        let mut c = Chunk::new();        
-        c.write_operation(Operation::PushNumber(v), 123);                
-        c.write_operation(Operation::Negate, 124);
-        c.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=c.to_slices();
-
+        let v = 1.2;        
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let c = function.mut_chunk().unwrap();
+            
+            // Over a number... should work
+            c.write_operation(Operation::PushNumber(v), 123);                
+            c.write_operation(Operation::Negate, 124);
+            c.write_operation(Operation::Return(0), 0);                        
+        }
+        
         let mut vm = VM::new();
-        assert!(vm.run(code, lines, c.constants()).is_ok()); 
+        vm.push_call_frame(CallFrame::new(0, function.clone_rc() ));
+        
+        //let c = function.chunk().unwrap();
+        assert!(vm.run(&vec![]).is_ok()); 
 
         let v2 = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(v2,-v);
@@ -501,28 +566,38 @@ mod tests {
     fn test_not(){
         
         // Over a Float... should not work
-        let v = 1.2;
-        let mut c = Chunk::new();        
-        c.write_operation(Operation::PushNumber(v), 123);                
-        c.write_operation(Operation::Not, 124);
-        c.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=c.to_slices();
+        let v = 1.2;        
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let c = function.mut_chunk().unwrap();
+    
+            c.write_operation(Operation::PushNumber(v), 123);                
+            c.write_operation(Operation::Not, 124);
+            c.write_operation(Operation::Return(0), 0);                        
 
+        }
+                
         let mut vm = VM::new();
-        assert!(!vm.run(code,lines, c.constants()).is_ok());                
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(!vm.run(&vec![]).is_ok());
         
-            
+                    
 
         // Over a boolean... should work
         let v = true;
-        let mut c = Chunk::new();        
-        c.write_operation(Operation::PushBool(v), 123);                
-        c.write_operation(Operation::Not, 124);
-        c.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=c.to_slices();
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let c = function.mut_chunk().unwrap();
+            c.write_operation(Operation::PushBool(v), 123);                
+            c.write_operation(Operation::Not, 124);
+            c.write_operation(Operation::Return(0), 0);                        
+    
+        }        
         
         let mut vm = VM::new();
-        assert!(vm.run(code,lines, c.constants()).is_ok());                
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(vm.run(&vec![]).is_ok());
+                        
         
     }
 
@@ -534,17 +609,20 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut chunk = Chunk::new();
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let chunk = function.mut_chunk().unwrap();
+                    
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushNumber(b), 123);                        
+            chunk.write_operation(Operation::Add, 124);
+            chunk.write_operation(Operation::Return(0), 0);                        
+        }
         
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushNumber(b), 123);                        
-        chunk.write_operation(Operation::Add, 124);
-
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
         
         let mut vm = VM::new();
-        assert!(vm.run(code,lines, chunk.constants()).is_ok());                                
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(vm.run(&vec![]).is_ok());                                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a+b,c);
@@ -554,16 +632,19 @@ mod tests {
         let a = 11.2;
         let b = true;
         
-        let mut chunk = Chunk::new();        
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushBool(b), 123);                        
-        chunk.write_operation(Operation::Add, 124);
-
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let chunk = function.mut_chunk().unwrap();
+            
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushBool(b), 123);                        
+            chunk.write_operation(Operation::Add, 124);
+            chunk.write_operation(Operation::Return(0), 0);                                        
+        }
         
         let mut vm = VM::new();
-        assert!(!vm.run(code,lines, chunk.constants()).is_ok());                             
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(!vm.run(&vec![]).is_ok());                             
 
     }
 
@@ -574,15 +655,19 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut chunk = Chunk::new();        
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushNumber(b), 123);                        
-        chunk.write_operation(Operation::Subtract, 124);
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let chunk = function.mut_chunk().unwrap();
+                    
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushNumber(b), 123);                        
+            chunk.write_operation(Operation::Subtract, 124);
+            chunk.write_operation(Operation::Return(0), 0);                                
+        }
         
         let mut vm = VM::new();
-        assert!(vm.run(code,lines, chunk.constants()).is_ok());                              
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(vm.run(&vec![]).is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a-b,c);
@@ -592,18 +677,24 @@ mod tests {
         // Int over something else... should not work
         let a = 12.;
         let b = true;
-        
-        let mut chunk = Chunk::new();
-        
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushBool(b), 123);                        
-        chunk.write_operation(Operation::Subtract, 124);
 
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let chunk = function.mut_chunk().unwrap();
+            
+            
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushBool(b), 123);                        
+            chunk.write_operation(Operation::Subtract, 124);
+            chunk.write_operation(Operation::Return(0), 0);                        
+
+        }
+        
+        
         
         let mut vm = VM::new();
-        assert!(!vm.run(code,lines, chunk.constants()).is_ok());                             
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(!vm.run( &vec![] ).is_ok());                             
     }
 
     #[test]
@@ -613,16 +704,22 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut chunk = Chunk::new();        
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushNumber(b), 123);                        
-        chunk.write_operation(Operation::Multiply, 124);
+        let mut function = Function::new_script(&format!("test_multiply"));
+        {
 
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+            let chunk = function.mut_chunk().unwrap();
+            
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushNumber(b), 123);                        
+            chunk.write_operation(Operation::Multiply, 124);
+            chunk.write_operation(Operation::Return(0), 0);                                        
+        }
         
+
         let mut vm = VM::new();
-        assert!(vm.run(code,lines, chunk.constants()).is_ok());                
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+
+        assert!(vm.run( &vec![]).is_ok());                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a*b,c);
@@ -632,16 +729,20 @@ mod tests {
         let a = 12.2;
         let b = true;
         
-        let mut chunk = Chunk::new();        
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushBool(b), 123);                        
-        chunk.write_operation(Operation::Multiply, 124);
+        let mut function = Function::new_script(&format!("test_multiply"));
+        {
 
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+            let chunk = function.mut_chunk().unwrap();
+            
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushBool(b), 123);                        
+            chunk.write_operation(Operation::Multiply, 124);
+            chunk.write_operation(Operation::Return(0), 0);                        
+        }
         
         let mut vm = VM::new();
-        assert!(!vm.run(code,lines, chunk.constants()).is_ok());                              
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));                
+        assert!(!vm.run(&vec![]).is_ok());                              
 
     }
 
@@ -652,16 +753,21 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut chunk = Chunk::new();        
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushNumber(b), 123);                        
-        chunk.write_operation(Operation::Divide, 124);
+        let mut function = Function::new_script(&format!("test_divide"));
+        {
 
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+            let chunk = function.mut_chunk().unwrap();
+            
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushNumber(b), 123);                        
+            chunk.write_operation(Operation::Divide, 124);
+            
+            chunk.write_operation(Operation::Return(0), 0);                        
+        }
         
         let mut vm = VM::new();
-        assert!(vm.run(code,lines, chunk.constants()).is_ok());                              
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(vm.run( &vec![]).is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a / b,c);
@@ -671,15 +777,19 @@ mod tests {
         let a = 12.1;
         let b = true;
         
-        let mut chunk = Chunk::new();              
-        chunk.write_operation(Operation::PushNumber(a), 123);                        
-        chunk.write_operation(Operation::PushBool(b), 123);                        
-        chunk.write_operation(Operation::Divide, 124);
+        let mut function = Function::new_script(&format!("test_negate"));
+        {
+            let chunk = function.mut_chunk().unwrap();
+            
+            chunk.write_operation(Operation::PushNumber(a), 123);                        
+            chunk.write_operation(Operation::PushBool(b), 123);                        
+            chunk.write_operation(Operation::Divide, 124);
+            chunk.write_operation(Operation::Return(0), 0);                        
 
-        chunk.write_operation(Operation::Return(0), 0);                        
-        let (code,lines)=chunk.to_slices();
+        }
         
         let mut vm = VM::new();
-        assert!(!vm.run(code,lines, chunk.constants()).is_ok());                                
+        vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
+        assert!(!vm.run(&vec![]).is_ok());                                
     }
 }

@@ -1,6 +1,6 @@
 use crate::options::Options;
 use crate::token::Token;
-use crate::script_fn::ScriptFn;
+use crate::function::Function;
 use crate::parser::Parser;
 
 pub struct Local {
@@ -24,7 +24,7 @@ pub struct Compiler {
 }
 
 
-pub fn compile(source: &Vec<u8>) -> Option<Box<ScriptFn>> {            
+pub fn compile(source: &Vec<u8>) -> Option<Function> {            
     let compiler_options : Options<CompilerOptions> = vec![];
 
     let mut compiler = Compiler::new(compiler_options);

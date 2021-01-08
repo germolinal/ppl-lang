@@ -1,31 +1,90 @@
 use std::any::Any;
+use std::rc::Rc;
 
-use crate::rust_fn::RustFn;
+use crate::native_fn::NativeFn;
 use crate::script_fn::ScriptFn;
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
 use crate::vm::{VM, InterpretResult};
-//use crate::chunk::Chunk;
+use crate::chunk::Chunk;
 
 
 pub enum Function{
-    Rust(RustFn),
-    Script(ScriptFn)
+    Native(Rc<NativeFn>),
+    Script(Rc<ScriptFn>)
 }
+
 
 impl Function {
 
-    pub fn new_script(name: &String)->ScriptFn{
-        ScriptFn::new(name)
+    pub fn clone_rc(&self)->Function{
+        match self {
+            Function::Native(v)=>Function::Native(Rc::clone(v)),
+            Function::Script(v)=>Function::Script(Rc::clone(v))
+        }
+    }
+
+    pub fn new_script(name: &String)->Function{
+        Function::Script(Rc::new(ScriptFn::new(name)))
     }
 
     pub fn get_name(&self)->&String{
         match self {
-            Function::Rust(v)=>&v.name,
+            Function::Native(v)=>&v.name,
             Function::Script(v)=>&v.name
         }
     }
+
+    pub fn is_native(&self)->bool{
+        match self {
+            Function::Native(_)=>true,
+            Function::Script(_)=>false
+        }
+    }
+
+    pub fn chunk(&self)->Option<&Chunk>{
+        match self{
+            Function::Native(_)=>None,
+            Function::Script(f)=>Some(f.chunk())
+        }
+    }
+
+    pub fn mut_chunk(&mut self)->Option<&mut Chunk>{
+        match self{
+            Function::Native(_)=>None,
+            Function::Script(f)=>{
+                match Rc::get_mut(f){
+                    Some(a)=>Some(a.mut_chunk()),
+                    None => panic!("Trying to get mut_chunk of a Function already shared")
+                }
+                //Some(f.mut_chunk())
+            }
+        }
+    }
     
+    pub fn push_constant(&mut self,v: Box<dyn ValueTrait>)->usize{
+        match self{
+            Function::Native(_)=>panic!("Trying to push constant to a native function"),
+            Function::Script(f)=> {
+                match Rc::get_mut(f){
+                    Some(a)=>a.push_constant(v),
+                    None => panic!("Trying push_constant to a Function already shared")
+                }                                
+            }
+        }
+    }
+
+    pub fn set_n_args(&mut self, n: usize){
+        match self{
+            Function::Native(_)=>panic!("Trying to set the number of arguments on a native function"),
+            Function::Script(f)=>{
+                match Rc::get_mut(f){
+                    Some(a)=>a.set_n_args(n),
+                    None => panic!("Trying set_n_args of a Function already shared")
+                }  
+            }                           
+        }
+    }
 
 }
 
@@ -33,7 +92,7 @@ impl ValueTrait for Function {
     // Basic i/o
     fn to_string(&self)->String {
         format!("fn {}()",match self {
-            Function::Rust(v)=>&v.name,
+            Function::Native(v)=>&v.name,
             Function::Script(v)=>&v.name
         })
     }
@@ -52,16 +111,21 @@ impl ValueTrait for Function {
     }
 
     fn call(&self, vm: &mut VM, n: usize)->Result<usize,String> {
+
+        // Check number of arguments
+
+        // Call
+
         match self {
             Function::Script(f) => {
-                let (code, lines) = f.chunk().to_slices();
-                if let InterpretResult::Ok(n) = vm.run(code,lines, f.chunk().constants()){                    
+                unimplemented!();
+                if let InterpretResult::Ok(n) = vm.run(f.chunk().heap()){                    
                     return Ok(n);
                 }else{
                     return Err(format!("Error when running function '{}'", f.name));
                 }
             },
-            Function::Rust(f)=>{
+            Function::Native(f)=>{
                 // Get the function
                 let rust_fn = f.func;                
                 // Call it

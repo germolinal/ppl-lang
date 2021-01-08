@@ -9,7 +9,7 @@ use crate::values::Value;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
-//#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Operation {
     Return(usize),
     Negate,

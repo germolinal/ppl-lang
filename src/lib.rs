@@ -6,12 +6,9 @@ mod value_trait;
 mod nil;
 mod number;
 mod boolean;
-//mod object;
-//mod array;
-//mod string;
 
 mod function;
-mod rust_fn;
+mod native_fn;
 mod script_fn;
 
 mod operations;
@@ -26,3 +23,4 @@ mod vm;
 
 mod package;
 mod compiler;
+mod call_frame;

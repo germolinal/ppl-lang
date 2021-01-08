@@ -2,9 +2,9 @@
 use crate::parser::*;
 use crate::token::*;
 use crate::operations::*;
-use crate::script_fn::ScriptFn;
 use crate::function::Function;
 use crate::compiler::Compiler;
+use std::rc::Rc;
 
 /* PARSING FUNCTIONS */
 
@@ -195,9 +195,9 @@ pub fn literal(parser: &mut Parser, _c: &mut Compiler){
 }
 
 /// Parses an anonymous function
-pub fn function(parser:&mut Parser, name: &String, compiler: &mut Compiler)->Option<Box<ScriptFn>>{
+pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Function>{
     // starts from the (), so it covers
-    // both fn(){} and fn ID(){}
+    // both 'let x = fn(){}' and 'fn ID(){}'
     // this becomes { let args[]; ...body...  }
     parser.show_tokens("function()");
     if !parser.consume(TokenType::LeftParen){
@@ -216,14 +216,30 @@ pub fn function(parser:&mut Parser, name: &String, compiler: &mut Compiler)->Opt
 
     // Create a new function, and plug it to the 
     // parser
-    let new_func = Box::new(ScriptFn::new(&name));
+    let new_func = Function::new_script(&name);
     parser.set_function(new_func); 
 
+    // Reset compiler
+    let mut compiler = Compiler::new(vec![]);
+
     // Open main scope
-    parser.begin_scope(compiler);
+    parser.begin_scope(&mut compiler);
 
     let mut n_vars : usize = 0;
-    parser.var_declaration(compiler, &mut n_vars);
+    parser.show_tokens("before var_declaration()");
+    match parser.current().token_type(){
+        // There are variables... declare them
+        TokenType::Identifier => parser.var_declaration(&mut compiler, &mut n_vars),
+        // Nothing to declare
+        TokenType::RightParen => {},
+        _ => {
+            parser.error_at_current(format!("Expecting ')' or Variable Identifiers after '(' in function declaration."));        
+            return None;
+        }
+
+    }
+    
+    
     if !parser.consume(TokenType::RightParen){
         parser.error_at_current(format!("Expecting ')' after variable list in function declaration"));        
         return None;
@@ -236,10 +252,10 @@ pub fn function(parser:&mut Parser, name: &String, compiler: &mut Compiler)->Opt
     }
 
     // Open, process, and close body    
-    parser.block(compiler);
+    parser.block(&mut compiler);
     
     // Close main scope
-    parser.end_scope(compiler);
+    parser.end_scope(&mut compiler);
 
     parser.show_tokens("function()  2");
 
@@ -264,7 +280,7 @@ pub fn function_value(parser:&mut Parser, compiler: &mut Compiler){
     
     if let Some(f) = function(parser,&format!("<Anonymous Function>"), compiler){        
         // f is now the function.
-        let v = Box::new(Function::Script(*f));
+        let v = Box::new(f);
         if let Some(i) = parser.push_constant(v){                
             parser.emit_byte(Operation::PushHeapRef(i));
         }        
