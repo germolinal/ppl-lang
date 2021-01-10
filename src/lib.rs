@@ -19,6 +19,7 @@ mod token;
 mod parse_function;
 
 mod parser;
+mod heap_list;
 
 mod package;
 

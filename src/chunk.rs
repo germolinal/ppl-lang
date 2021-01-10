@@ -2,6 +2,8 @@
 
 use crate::operations::*;
 use crate::value_trait::ValueTrait;
+use crate::heap_list::HeapList;
+
 
 /// Represents a set of operations and values
 
@@ -12,30 +14,12 @@ pub struct Chunk {
     code : Vec<Operation>,
 
     /// The values contained in the code
-    heap : Vec<Box<dyn ValueTrait>>,
+    heap : HeapList,
 
     /// The lines at which each instruction was created
     lines : Vec<usize>,
 }
 
-/*
-impl Clone for Chunk {
-    fn clone(&self) -> Self{
-        let mut code : Vec<Operation> = Vec::with_capacity(self.code.len());
-        let mut lines : Vec<usize> = Vec::with_capacity(self.lines.len());
-
-        for i in 0..code.len(){
-            code.push(self.code[i].clone());
-            lines.push(self.lines[i]);
-        }
-
-        Self{
-            code: code,
-            lines: lines,
-        }
-    }
-}
-*/
 
 impl Chunk { 
 
@@ -43,7 +27,7 @@ impl Chunk {
     pub fn new()->Self{
         Self{
             code: Vec::with_capacity(1024),
-            heap: Vec::with_capacity(1024),
+            heap: HeapList::new(),
             lines: Vec::with_capacity(1024),
         }
     }
@@ -95,19 +79,17 @@ impl Chunk {
     }
     
     
-    /// Adds a value to the Chunk
+    /// Adds a value to the Heap in the Chunk
     /// # Arguments
     /// * v: the value to add    
-    pub fn push_constant(&mut self, v : Box<dyn ValueTrait>)-> usize {
-        if self.heap.len() >= self.heap.capacity() {
-            panic!("The max number of elements in the heap of a Chunk ({}) has been exceeded", self.heap.capacity());
-        }
-
-        self.heap.push(v);        
-        self.heap.len()-1// as u8;
+    /// 
+    /// # Panic
+    /// Panics when the heap is full
+    pub fn push_to_heap(&mut self, v : Box<dyn ValueTrait>)-> usize {        
+        self.heap.push(v)                
     }
 
-    pub fn heap(&self)->&Vec<Box<dyn ValueTrait>>{
+    pub fn heap(&self)-> &HeapList {
         &self.heap
     }
     
@@ -126,8 +108,7 @@ mod tests {
     #[test]
     fn test_new() {
         let c = Chunk::new();        
-        assert_eq!(0, c.code.len());
-        //assert_eq!(0, c.heap.len());        
+        assert_eq!(0, c.code.len());             
     }
 
     #[test]

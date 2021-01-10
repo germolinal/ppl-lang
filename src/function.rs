@@ -66,7 +66,7 @@ impl Function {
             Function::Native(_)=>panic!("Trying to push constant to a native function"),
             Function::Script(f)=> {
                 match Rc::get_mut(f){
-                    Some(a)=>a.push_constant(v),
+                    Some(a)=>a.push_to_heap(v),
                     None => panic!("Trying push_constant to a Function already shared")
                 }                                
             }

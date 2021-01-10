@@ -20,8 +20,8 @@ impl ScriptFn {
         }
     }
     
-    pub fn push_constant(&mut self, v: Box<dyn ValueTrait>)->usize{
-        self.chunk.push_constant(v)
+    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>)->usize{
+        self.chunk.push_to_heap(v)
     }
 
     pub fn chunk(&self)->&Chunk{
