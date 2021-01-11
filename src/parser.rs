@@ -25,7 +25,7 @@ pub enum Precedence{
 }
 
 
-type ParseFn = fn(&mut Parser, &mut Compiler);
+type ParseFn = fn(can_assign: bool, &mut Parser, &mut Compiler);
 
 pub struct ParseRule {
     pub prefix: Option<ParseFn>,
@@ -41,11 +41,9 @@ pub struct Parser<'a>{
     had_error: bool,
     panic_mode: bool,
     scanner: Scanner<'a>,    
-
-    // No need to cover NativeFn because it is not scanned.
+    
     current_function: Option<Function>,        
     //current_package: &'a mut Package
-
 }
 
 impl <'a>Parser<'a>{
@@ -62,10 +60,7 @@ impl <'a>Parser<'a>{
             had_error: false,
             panic_mode: false,
             current: current,
-            previous: previous,
-
-            //compiler: Some(Compiler::new(vec![])),
-
+            previous: previous,            
             current_function : Some(main_function),                  
         }
     }
@@ -74,16 +69,6 @@ impl <'a>Parser<'a>{
         self.current_function.take()
     }
 
-    /*
-    pub fn current_function(&self)->Result<&Box<ScriptFn>,String>{
-        match self.current_function {
-            Some(v) =>Ok(&v),
-            None => {
-                return Err(format!("Trying to get Parser's current compilation function, but found None"));                
-            }
-        }
-    }
-    */
     
 
     pub fn set_function(&mut self, func : Function){
@@ -113,7 +98,7 @@ impl <'a>Parser<'a>{
     }
 
     
-    pub fn push_constant(&mut self, v: Box<dyn ValueTrait>)->Option<usize>{
+    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>)->Option<usize>{
         match &mut self.current_function{
             Some(f)=>{
                 Some(f.push_constant(v))
@@ -133,32 +118,6 @@ impl <'a>Parser<'a>{
     pub fn show_tokens(&self, msg: &str){
         println!("at {} == previous: {} | current: {}", msg, debug::token(self.previous,self.scanner.source()), debug::token(self.current, self.scanner.source()));
     }
-
-    /*
-    fn scope_depth(&self)->usize{
-        self.variable_count.len()
-    } 
-    */   
-
-    /*
-    fn borrow_mut_compiler(&mut self)->&mut Compiler{
-        match &mut self.compiler {
-            Some(c)=> c,
-            None => {
-                panic!("Trying to borrow an inexistent compiler!");                
-            }
-        }
-    }
-
-    fn borrow_compiler(&mut self)->&Compiler{
-        match &self.compiler {
-            Some(c)=> c,
-            None => {                
-                panic!("Trying to borrow an inexistent compiler!");                
-            }
-        }
-    }
-    */
     
     
     pub fn previous(&self)->&Token{
@@ -192,64 +151,13 @@ impl <'a>Parser<'a>{
         false
     }
 
-    /*
-    fn search_var(&self,var_name: &String, n_vars: usize)->Option<usize>{
-
-        
-        let fin = self.variables.len();
-        let ini = fin - n_vars;
-        for i in (ini..fin).rev(){
-            if &self.variables[i] == var_name{
-                return Some(i)
-            }
-        }
-        None
-    }
-
-    
-    pub fn find_var_in_scope(&self, var_name: &String)->Option<usize>{
-        
-        let n_vars = self.variable_count[self.scope_depth()-1];
-        
-        self.search_var(var_name, n_vars)
-    }
-    
-    pub fn find_var(&self, var_name: &String)->Option<usize>{
-        self.search_var(var_name, self.variables.len())        
-    }
-    
-    
-    pub fn push_variable(&mut self, name: String, v: Value){
-        // Register variable in the parser
-        self.variables.push(name);
-        
-        
-        // Register the variable in the VM
-        self.emit_byte(Operation::PushVar(v));
-        
-        // Take note of the variable registration
-        let depth = self.variable_count.len();
-        self.variable_count[depth-1] += 1;
-        
-    }
-    */
-
-    /*
-    pub fn consume_previous(&mut self, expected_type: TokenType)->bool{
-        if self.previous.token_type() == expected_type {
-            self.advance();
-            return true;
-        }        
-        false
-    }
-    */
 
     pub fn check(&self, t: TokenType)->bool{
         self.current.token_type() == t
     }
 
     
-    fn match_token(&mut self, t: TokenType) -> bool{
+    pub fn match_token(&mut self, t: TokenType) -> bool{
         if !self.check(t) {
             return false;
         }
@@ -472,19 +380,21 @@ impl <'a>Parser<'a>{
         self.advance();
         let rule = match self.get_rule(self.previous.token_type()).prefix {
             Some(r) => r,
-            None =>{
+            None => {
                 self.error_at_current(format!("Expecting expression.")); 
                 return;
             }
         };
 
+        let can_assign : bool = precedence <= Precedence::Assignment;
+
         // Run the rule
-        rule(self, compiler);
+        rule(can_assign, self, compiler);
 
         while precedence <= self.get_rule(self.current.token_type()).precedence {
             self.advance();
             match self.get_rule(self.previous.token_type()).infix{
-                Some(r)=>r(self, compiler),
+                Some(r)=>r(can_assign, self, compiler),
                 None => self.internal_error_at_current(format!("No infix rule!"))
             }
         }                
@@ -519,7 +429,7 @@ impl <'a>Parser<'a>{
             }
             return None;
         }else{
-            self.emit_byte(Operation::Return(0));
+            self.emit_byte(Operation::Return);
             return self.take_current_function();
         }
     }
@@ -544,7 +454,7 @@ impl <'a>Parser<'a>{
                 let mut n : usize= 0;
                 self.var_declaration(compiler, &mut n);
             },
-            _ => {                
+            _ => {                                
                 self.statement(compiler);
             }
         }
@@ -573,7 +483,7 @@ impl <'a>Parser<'a>{
         };
 
         // Push constant.
-        if let Some(i) = self.push_constant(Box::new(func)){
+        if let Some(i) = self.push_to_heap(Box::new(func)){
             // Register the function
             self.emit_byte(Operation::PushHeapRef(i));            
         }
@@ -836,7 +746,7 @@ impl <'a>Parser<'a>{
                 // only one value can be returned
                 self.advance();
                 self.expression(compiler);
-                self.emit_byte(Operation::Return(1))
+                self.emit_byte(Operation::Return)
             },
             TokenType::While =>{
                 self.advance();
@@ -845,7 +755,11 @@ impl <'a>Parser<'a>{
             TokenType::EOF=>{
                 return
             },
-            _ => self.expression(compiler)
+            _ => {
+                // Expression-statement
+                self.expression(compiler);
+                self.emit_byte(Operation::Pop(1));
+            }
         }
     }
 
@@ -1055,7 +969,8 @@ mod tests {
             _ => {panic!("Expecting Number, found {}", debug::token(parser.previous, parser.scanner.source()))}
         }
         
-        number(&mut parser,&mut compiler);        
+        
+        number(false, &mut parser,&mut compiler);        
         if let Operation::PushNumber(found) = parser.chunk().unwrap().code().last().unwrap() {            
             assert_eq!(2.0,*found);            
         }else{
@@ -1075,8 +990,8 @@ mod tests {
             _ => {panic!("Expecting Number, found {}", debug::token(parser.previous, parser.scanner.source()))}
         }
         
-        number(&mut parser,&mut compiler);
-        number(&mut parser,&mut compiler);        
+        number(false, &mut parser,&mut compiler);
+        number(false, &mut parser,&mut compiler);        
         if let Operation::PushNumber(found) = parser.chunk().unwrap().code().last().unwrap() {            
             assert_eq!(2.1,*found);            
         }else{

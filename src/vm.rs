@@ -50,23 +50,22 @@ impl VM {
     pub fn run( &mut self ) -> InterpretResult {
                 
         
-        let frame_n = self.call_frames.len() - 1;
-        let first_call_frame_slot = self.call_frames[frame_n].first_slot();
+        let mut frame_n = self.call_frames.len() - 1;
         
         loop {          
+            let first_call_frame_slot = self.call_frames[frame_n].first_slot();
             let ip = self.call_frames[frame_n].ip();
 
             if ip >= self.call_frames[frame_n].n_operations().unwrap(){                
                 break;
             }   
-            println!("IP == {}", ip);
             /*****************************/
             /* Dissassemble when developing */
             /*****************************/
             #[cfg(debug_assertions)]
             {
                 // report stack
-                print!("  --> Stack: [");
+                print!("  --> n_frames: {} | Stack: [", frame_n);
                                             
                 for val in self.stack.iter() {                    
                     print!("{}, ", val.to_string());                    
@@ -84,15 +83,34 @@ impl VM {
             let (current_operation, _)=self.call_frames[frame_n].current_instruction_and_line().unwrap();
             
             match current_operation {
-                Operation::Return(n) => {   
-                    
-                    // Go back one call_frame
-                    self.pop_call_frame().unwrap();
-                    if self.call_frames.len() == 0 {
-                        return InterpretResult::Ok(n);    
+                Operation::Return => {   
+                                        
+                    /* IF THIS SI THE RETURN FROM A FUNCTION */
+                    if frame_n > 0 {                        
+                        // Get the value
+                        let ret_value = self.pop().unwrap();
+                                                
+                        // Restore stack to what was before this                                         
+                        while self.stack.len() > self.call_frames[frame_n].first_slot(){
+                            self.pop().unwrap();
+                        }                   
+                        
+                        // (and also the function) itself
+                        if self.stack.len() > 0 {
+                            self.pop().unwrap();
+                        }
+    
+                        // Go back one call_frame
+                        self.pop_call_frame().unwrap();                        
+                        frame_n -= 1;
+                        
+    
+                        self.push(ret_value);
+                    }else{
+                        /* OTHERWISE, RETURN FROM THE PROGRAM */
+                        return InterpretResult::Ok(1);
                     }
-
-                    return InterpretResult::Ok(n);
+                    
                 },                
                 Operation::PushBool(v)=>{
                     self.push(Value::Bool(v))
@@ -104,6 +122,7 @@ impl VM {
                     self.push(Value::Nil)
                 }                                   
                 Operation::GetLocal(i)=>{  
+                    println!("first slot: {}", first_call_frame_slot);
                     let absolute_position = i + first_call_frame_slot;
                     let local = self.stack[absolute_position];
                     // Check if it has been initialized
@@ -115,7 +134,8 @@ impl VM {
                 },
                 Operation::SetLocal(i)=>{      
                     let absolute_position = i + first_call_frame_slot;
-                    self.stack[absolute_position] = self.pop().unwrap();                                                                                                                 
+                    let last = self.stack.len()-1;
+                    self.stack[absolute_position] = self.stack[last];//self.pop().unwrap();                                                                                                                 
                 },                
                 Operation::Pop(n)=>{                    
                     for _ in 0..n {
@@ -395,12 +415,25 @@ impl VM {
                                 Some(f)=>f.clone_rc(),
                                 None => return InterpretResult::RuntimeError(format!("Trying to call from a '{}' object as if it was a function", chunk.get_constant(i).unwrap().type_name()))
                             };
+                        
+                            let f_name = function.get_name();
+                            debug::chunk(function.chunk().unwrap(), f_name.clone());
 
-                        // Add the function to the stack, and continue 
-                        // in business as usual.                                         
-                        self.push_call_frame(CallFrame::new(0,function));
-
-                        unimplemented!();
+                        match function.call(self,n_vars){
+                            Ok(_n_returns)=>{
+                                // Add the function to the stack, and continue 
+                                // in business as usual.                       
+                                let first_slot = self.stack.len() - n_vars;                  
+                                self.push_call_frame(CallFrame::new(first_slot,function));                        
+                                frame_n += 1;
+                                //self.run();
+                                //self.pop_call_frame().unwrap();
+                            },
+                            Err(e)=>panic!(e)
+                        }
+                        
+                        
+                        //unimplemented!();
                         /*
                         // This will push all the returned values; and on top,
                         // the number of returned values 
@@ -430,7 +463,10 @@ impl VM {
 
         }// end of loop.
 
-        return InterpretResult::RuntimeError("No RETURN operation found".to_string());
+        let current_function = self.call_frames[frame_n].function();
+        let f_name = current_function.get_name();
+
+        return InterpretResult::RuntimeError(format!("No RETURN operation found in function '{}'", f_name));
         
     }
 
@@ -515,23 +551,7 @@ mod tests {
         
     }
 
-    /*
-    #[test]
-    fn test_constant(){
-        let v = 1.2;
-        let mut c = Chunk::new();
-
-        let constant_i = c.add_constant(Value::new_number(v));                        
-        c.write_operation(Operation::Constant(constant_i), 123);                
-        c.write_operation(Operation::Return, 0);
-        c.write_operation(Operation::Return, 0);
-        
-        assert_eq!(c.code().len(),3);
-
-        let mut vm = VM::new();
-        vm.run(&c);        
-    }
-    */
+    
 
     use crate::function::Function;
     #[test]
@@ -545,7 +565,7 @@ mod tests {
             // Over a number... should work
             c.write_operation(Operation::PushNumber(v), 123);                
             c.write_operation(Operation::Negate, 124);
-            c.write_operation(Operation::Return(0), 0);                        
+            c.write_operation(Operation::Return, 0);                        
         }
         
         let mut vm = VM::new();
@@ -572,7 +592,7 @@ mod tests {
     
             c.write_operation(Operation::PushNumber(v), 123);                
             c.write_operation(Operation::Not, 124);
-            c.write_operation(Operation::Return(0), 0);                        
+            c.write_operation(Operation::Return, 0);                        
 
         }
                 
@@ -589,7 +609,7 @@ mod tests {
             let c = function.mut_chunk().unwrap();
             c.write_operation(Operation::PushBool(v), 123);                
             c.write_operation(Operation::Not, 124);
-            c.write_operation(Operation::Return(0), 0);                        
+            c.write_operation(Operation::Return, 0);                        
     
         }        
         
@@ -615,7 +635,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushNumber(b), 123);                        
             chunk.write_operation(Operation::Add, 124);
-            chunk.write_operation(Operation::Return(0), 0);                        
+            chunk.write_operation(Operation::Return, 0);                        
         }
         
         
@@ -638,7 +658,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushBool(b), 123);                        
             chunk.write_operation(Operation::Add, 124);
-            chunk.write_operation(Operation::Return(0), 0);                                        
+            chunk.write_operation(Operation::Return, 0);                                        
         }
         
         let mut vm = VM::new();
@@ -661,7 +681,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushNumber(b), 123);                        
             chunk.write_operation(Operation::Subtract, 124);
-            chunk.write_operation(Operation::Return(0), 0);                                
+            chunk.write_operation(Operation::Return, 0);                                
         }
         
         let mut vm = VM::new();
@@ -685,7 +705,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushBool(b), 123);                        
             chunk.write_operation(Operation::Subtract, 124);
-            chunk.write_operation(Operation::Return(0), 0);                        
+            chunk.write_operation(Operation::Return, 0);                        
 
         }
         
@@ -711,7 +731,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushNumber(b), 123);                        
             chunk.write_operation(Operation::Multiply, 124);
-            chunk.write_operation(Operation::Return(0), 0);                                        
+            chunk.write_operation(Operation::Return, 0);                                        
         }
         
 
@@ -736,7 +756,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushBool(b), 123);                        
             chunk.write_operation(Operation::Multiply, 124);
-            chunk.write_operation(Operation::Return(0), 0);                        
+            chunk.write_operation(Operation::Return, 0);                        
         }
         
         let mut vm = VM::new();
@@ -761,7 +781,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(b), 123);                        
             chunk.write_operation(Operation::Divide, 124);
             
-            chunk.write_operation(Operation::Return(0), 0);                        
+            chunk.write_operation(Operation::Return, 0);                        
         }
         
         let mut vm = VM::new();
@@ -783,7 +803,7 @@ mod tests {
             chunk.write_operation(Operation::PushNumber(a), 123);                        
             chunk.write_operation(Operation::PushBool(b), 123);                        
             chunk.write_operation(Operation::Divide, 124);
-            chunk.write_operation(Operation::Return(0), 0);                        
+            chunk.write_operation(Operation::Return, 0);                        
 
         }
         

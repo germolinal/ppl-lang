@@ -9,3 +9,17 @@ messy block comment
   
 let other_literal = 21
 
+some_literal = other_literal
+
+let f = fn(a,b){
+    return a*2 + b
+}
+
+let y = f(1111, 2222)
+
+//let x=1,y,z
+//y = z = 3/2 * 2.5
+
+//let y = 2
+
+//return 1

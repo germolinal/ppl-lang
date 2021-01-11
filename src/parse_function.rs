@@ -6,7 +6,12 @@ use crate::function::Function;
 use crate::compiler::Compiler;
 
 /* PARSING FUNCTIONS */
-pub fn unary(parser: &mut Parser, compiler: &mut Compiler){
+
+
+/// Processes a unitary operation.
+/// 
+/// Does not use the 'can_assign'
+pub fn unary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
         
     // Get the unary Token
     let token_type = parser.previous().token_type();
@@ -28,7 +33,7 @@ pub fn unary(parser: &mut Parser, compiler: &mut Compiler){
     };
 }
 
-pub fn string(_parser: &mut Parser, _c: &mut Compiler){
+pub fn string(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
     /*
     let v = parser.previous().source_text(parser.source());                
     parser.emit_byte(Operation::PushString(Box::new(v)));
@@ -36,7 +41,7 @@ pub fn string(_parser: &mut Parser, _c: &mut Compiler){
     unimplemented!();
 }
 
-pub fn array(_parser: &mut Parser, _c: &mut Compiler){
+pub fn array(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
     unimplemented!();
     /*
     //parser.advance();
@@ -60,7 +65,8 @@ pub fn array(_parser: &mut Parser, _c: &mut Compiler){
     */
 }
 
-pub fn number(parser: &mut Parser, _c: &mut Compiler){
+/// Parses a number... does not use the 'can_assign'
+pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
     let v = parser.previous().source_text(parser.source());            
     let the_v = match v.parse::<f64>(){
         Ok(v)=>v,
@@ -72,8 +78,8 @@ pub fn number(parser: &mut Parser, _c: &mut Compiler){
 }
 
 
-
-pub fn index(_parser: &mut Parser, _c: &mut Compiler){
+/// Parses an indexation (i.e. x[i]) operation
+pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
     unimplemented!();
 }
 
@@ -102,8 +108,12 @@ fn arg_list(parser: &mut Parser, compiler: &mut Compiler, n: &mut usize){
     }
 }
 
-pub fn call(parser:&mut Parser, compiler: &mut Compiler){
-
+/// Parses a call...
+///
+/// Does not use the 'can_assign'
+pub fn call(_can_assign: bool, parser:&mut Parser, compiler: &mut Compiler){
+    
+    
     // Push arguments
     let mut n_args = 0;    
 
@@ -115,11 +125,15 @@ pub fn call(parser:&mut Parser, compiler: &mut Compiler){
         parser.error_at_current(format!("Expected ')' after argument list in function call"));
     }
     
+
     parser.emit_byte(Operation::Call(n_args));
 
 }
 
-pub fn grouping(parser: &mut Parser, compiler: &mut Compiler){
+/// Parses grouping (e.g., '(x*y/z)' )
+/// 
+/// Does not use the 'can_assign'
+pub fn grouping(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
     // left paren has been consumed
     parser.expression(compiler);
     if !parser.consume(TokenType::RightParen) {
@@ -127,8 +141,10 @@ pub fn grouping(parser: &mut Parser, compiler: &mut Compiler){
     }
 }
 
-
-pub fn binary(parser: &mut Parser, compiler: &mut Compiler){
+/// Parses binary operation.
+/// 
+/// Does not use the 'can_assign'
+pub fn binary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
     // Get the Binary
     let operator_type = parser.previous().token_type();
 
@@ -183,7 +199,10 @@ pub fn binary(parser: &mut Parser, compiler: &mut Compiler){
     
 }
 
-pub fn literal(parser: &mut Parser, _c: &mut Compiler){
+/// Parses literals. 
+/// 
+/// Does not use the 'can_assign'
+pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
     match parser.previous().token_type(){
         TokenType::False => parser.emit_byte(Operation::PushBool(false)),
         TokenType::True => parser.emit_byte(Operation::PushBool(true)),        
@@ -251,8 +270,9 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
     // Open, process, and close body    
     parser.block(&mut compiler);
     
-    // Close main scope
-    parser.end_scope(&mut compiler);
+    // No end_scope()... this is done 
+    // when processing the Return operation
+    // parser.end_scope(&mut compiler);
 
     parser.show_tokens("function()  2");
 
@@ -265,6 +285,18 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
         }
     };
     
+    // Check if the function returns anything. If not, 
+    // Return Nil.
+    let (code,lines) = new_func.chunk().unwrap().to_slices();
+    let c_len = code.len();
+    if c_len == 0 || Operation::Return != code[c_len - 1]{
+        let last_line = if c_len == 0 { 0 } else { lines[c_len - 1] };
+        let c = new_func.mut_chunk().unwrap();
+        c.write_operation(Operation::PushNil, last_line);
+        c.write_operation(Operation::Return, last_line);
+    }
+
+
     // Restore the old one
     parser.set_function(old_func);
     new_func.set_n_args(n_vars);
@@ -273,29 +305,40 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
 }
 
 /// Anonymous function parser
-pub fn function_value(parser:&mut Parser, compiler: &mut Compiler){
+/// 
+/// Does not use the 'can_assign'
+pub fn function_value(_can_assign: bool, parser:&mut Parser, compiler: &mut Compiler){
     
     if let Some(f) = function(parser,&format!("<Anonymous Function>"), compiler){        
         // f is now the function.
         let v = Box::new(f);
-        if let Some(i) = parser.push_constant(v){                
+        if let Some(i) = parser.push_to_heap(v){                
             parser.emit_byte(Operation::PushHeapRef(i));
         }        
     }
 }
 
 
-pub fn variable( parser: &mut Parser, compiler: &mut Compiler){
+pub fn variable(can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
     // search back for a variable with the same name
     let var_name = parser.previous();
         
     match compiler.get_local(&var_name, parser.source()){
         Some(i)=>{
-            parser.emit_byte(Operation::GetLocal(i))
+
+            if can_assign && parser.match_token(TokenType::Equal){
+                println!("Assigning to Var {}!", i);
+                parser.expression(compiler);
+                parser.emit_byte(Operation::SetLocal(i))
+            }else{
+                println!("Getting var {}!", i);
+                parser.emit_byte(Operation::GetLocal(i));
+            }
+            
         },
         None => panic!("Could not find Variable '{}'", var_name.source_text(parser.source() ))
     }
-        
+    
 }
 
 

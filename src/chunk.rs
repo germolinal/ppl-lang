@@ -32,11 +32,12 @@ impl Chunk {
         }
     }
 
-    
+    /// Borrows the code array
     pub fn code(&self)->&Vec<Operation>{
         &self.code
     }
 
+    /// Replaces an element in code
     pub fn patch_code(&mut self, i: usize, op: Operation){
         self.code[i]=op;
     }
@@ -89,6 +90,7 @@ impl Chunk {
         self.heap.push(v)                
     }
 
+    /// Borrows the Heap
     pub fn heap(&self)-> &HeapList {
         &self.heap
     }
@@ -104,6 +106,7 @@ impl Chunk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::values::*;
 
     #[test]
     fn test_new() {
@@ -114,31 +117,12 @@ mod tests {
     #[test]
     fn test_write() {
         let mut c = Chunk::new();        
-        c.write_operation(Operation::Return(0), 0);
+        c.write_operation(Operation::Return, 0);
 
         assert_eq!(1, c.code.len());
         
     }
 
-    /*
-    #[test]
-    fn test_add_constant(){
-        let v = 1.2;
-        let mut c = Chunk::new();
-        let i = c.add_constant(Value::new_number(v));
-
-        let found = c.heap[0];
-        assert_eq!(v,found.unrwap_number().unwrap());
-        assert_eq!(i,0);
-        
-
-
-        let i = c.add_constant(Value::new_number(2.0*v));
-
-        let found = c.heap[1];
-        assert_eq!(v*2.0,found.unrwap_number().unwrap());
-        assert_eq!(i,1);
-        
-    }
-    */
+    
+    
 }

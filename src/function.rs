@@ -109,16 +109,19 @@ impl ValueTrait for Function {
         panic!("Trying to clone a function.")
     }
 
-    fn call(&self, vm: &mut VM, n: usize)->Result<usize,String> {
-
-        // Check number of arguments
+    fn call(&self, vm: &mut VM, n_args: usize)->Result<usize,String> {
 
         // Call
 
         match self {
-            Function::Script(_) => {
-                unimplemented!();
+            Function::Script(f) => {
+                // Check number of arguments
+                if n_args != f.n_args {
+                    return Err(format!("Incorrect number of arguments. Found {}, required {}", n_args, f.n_args));
+                }
+                return Ok(1);
                 /*
+                unimplemented!();
                 if let InterpretResult::Ok(n) = vm.run(){                    
                     return Ok(n);
                 }else{
@@ -130,7 +133,7 @@ impl ValueTrait for Function {
                 // Get the function
                 let rust_fn = f.func;                
                 // Call it
-                Ok(rust_fn(vm,n))
+                Ok(rust_fn(vm,n_args))
             }
         }
     }

@@ -41,8 +41,8 @@ pub mod debug {
     
         match op {
             
-            Operation::Return(n) => {
-                return println!("OP_RETURN '{}'", n);
+            Operation::Return => {
+                return println!("OP_RETURN");
             },
     
             /*

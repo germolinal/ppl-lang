@@ -1,9 +1,9 @@
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Operation {
-    Return(usize),
+    Return,
     Negate,
     Not,
     Add,

@@ -141,7 +141,7 @@ impl ValueTrait for Value  {
             Value::Nil => ValueTrait::to_string(&Nil::new()),
             Value::Number(v) => ValueTrait::to_string(v),
             Value::Bool(v) => ValueTrait::to_string(v),
-            Value::HeapRef(i)=>format!("VarRev<{}>", i),                                  
+            Value::HeapRef(i)=>format!("HeapRef<{}>", i),                                  
         }
     }
 
