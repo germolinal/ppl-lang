@@ -7,6 +7,9 @@ use crate::function::Function;
 use crate::value_trait::ValueTrait;
 use crate::operations::Operation;
 use crate::compiler::Compiler;
+use crate::heap_list::HeapList;
+
+pub type Chunk = Vec<(Operation, usize)>;
 
 #[repr(u8)] 
 #[derive(PartialEq,PartialOrd)]
@@ -78,7 +81,7 @@ impl <'a>Parser<'a>{
 
     pub fn chunk_len(&mut self)->Option<usize>{
         match &self.current_function {
-            Some(f)=>Some(f.chunk().unwrap().code().len()),
+            Some(f)=>Some(f.chunk().unwrap().len()),
             None => {
                 self.error_no_current_function();
                 None
@@ -89,7 +92,9 @@ impl <'a>Parser<'a>{
     pub fn patch_chunk(&mut self, position: usize, op: Operation){
         match &mut self.current_function{
             Some(f)=>{
-                f.mut_chunk().unwrap().patch_code(position,op)
+                let chunk = f.mut_chunk().unwrap();
+                let (_, ln) = chunk[position];
+                chunk[position] = (op, ln);
             }
             None => {
                 self.error_no_current_function()                
@@ -98,10 +103,10 @@ impl <'a>Parser<'a>{
     }
 
     
-    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>)->Option<usize>{
+    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>, heap: &mut HeapList)->Option<usize>{
         match &mut self.current_function{
             Some(f)=>{
-                Some(f.push_constant(v))
+                Some(heap.push(v))
             }
             None => {
                 self.error_no_current_function();
@@ -168,7 +173,7 @@ impl <'a>Parser<'a>{
 
     pub fn emit_byte(&mut self, op: Operation){
         match &mut self.current_function{
-            Some(f)=>f.mut_chunk().unwrap().write_operation(op, self.previous.line()),
+            Some(f)=>f.mut_chunk().unwrap().push( (op, self.previous.line()) ),
             None => self.error_no_current_function()                
         }        
     }
@@ -452,7 +457,7 @@ impl <'a>Parser<'a>{
             TokenType::Let => {
                 self.advance();
                 let mut n : usize= 0;
-                self.var_declaration(compiler, &mut n);
+                self.var_declaration(compiler, true, &mut n);
             },
             _ => {                                
                 self.statement(compiler);
@@ -465,7 +470,7 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar
     /// function -> fn IDENTIFIER (varlist) BLOCK
-    fn fn_declaration(&mut self , compiler: &mut Compiler){
+    fn fn_declaration(&mut self , compiler: &mut Compiler, heap: &mut HeapList){
         // fn has been consumed.
         let func_name = if self.consume(TokenType::Identifier){
             self.previous
@@ -483,7 +488,7 @@ impl <'a>Parser<'a>{
         };
 
         // Push constant.
-        if let Some(i) = self.push_to_heap(Box::new(func)){
+        if let Some(i) = self.push_to_heap(Box::new(func), heap){
             // Register the function
             self.emit_byte(Operation::PushHeapRef(i));            
         }
@@ -495,7 +500,7 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// var_declaration -> "let" IDENTIFIER ("=" expression)
-    pub fn var_declaration(&mut self, compiler: &mut Compiler, n_declared_vars : &mut usize){        
+    pub fn var_declaration(&mut self, compiler: &mut Compiler, define: bool, n_declared_vars : &mut usize){        
         
         // Get the token representing the name
         if !self.consume(TokenType::Identifier){
@@ -506,17 +511,18 @@ impl <'a>Parser<'a>{
         // Declare the variable
         self.declare_variable(compiler);
 
-        // Define it if needed
-        if self.match_token(TokenType::Equal){                                                
-            // Put value of expression on the stack                        
-            self.expression(compiler);                             
-        }else{
-            // Or NIL.
-            self.emit_byte(Operation::PushNil);            
+        if define {
+            // Define 
+            if self.match_token(TokenType::Equal){                                                
+                // Put value of expression on the stack                        
+                self.expression(compiler);                             
+            }else{
+                // Or NIL.
+                self.emit_byte(Operation::PushNil);            
+            }
+                
+            self.define_variable(compiler);
         }
-
-        // Define
-        self.define_variable(compiler);
                 
 
         // Count the declared variable
@@ -525,7 +531,7 @@ impl <'a>Parser<'a>{
         
         // Check if there is another variable afterwards
         if self.consume(TokenType::Comma) {
-            self.var_declaration(compiler, n_declared_vars);
+            self.var_declaration(compiler, define, n_declared_vars);
         }    
         
     }
@@ -670,7 +676,7 @@ impl <'a>Parser<'a>{
         // consume declare the variables
         self.show_tokens("for_statement - Before VAR Declaration");
         let mut n_declared_vars : usize = 0;
-        self.var_declaration(compiler, &mut n_declared_vars);        
+        self.var_declaration(compiler, true, &mut n_declared_vars);        
         self.show_tokens("for_statement - AFTER VAR Declaration");
         println!(" ----> Declared {}",n_declared_vars);
         
@@ -971,7 +977,7 @@ mod tests {
         
         
         number(false, &mut parser,&mut compiler);        
-        if let Operation::PushNumber(found) = parser.chunk().unwrap().code().last().unwrap() {            
+        if let (Operation::PushNumber(found), _) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.0,*found);            
         }else{
             assert!(false);
@@ -992,7 +998,7 @@ mod tests {
         
         number(false, &mut parser,&mut compiler);
         number(false, &mut parser,&mut compiler);        
-        if let Operation::PushNumber(found) = parser.chunk().unwrap().code().last().unwrap() {            
+        if let (Operation::PushNumber(found),_) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.1,*found);            
         }else{
             assert!(false);
@@ -1053,29 +1059,29 @@ mod tests {
             debug::chunk(chunk, format!("test_var_declaration_1"));
             
             // define X (should be nil)
-            if let Operation::PushNil = chunk.code()[0]{
+            if let (Operation::PushNil,_) = chunk[0]{
                 assert!(true);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 0);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 0);
                 assert!(false)
             };
 
             // Push y, should be 2
-            if let Operation::PushNumber(v) = chunk.code()[1]{
+            if let (Operation::PushNumber(v),_) = chunk[1]{
                 assert_eq!(v, 2.0);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 1);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 1);
                 assert!(false)
             };
 
             // Push i, should be Nil
-            if let Operation::PushNil = chunk.code()[2]{
+            if let (Operation::PushNil,_) = chunk[2]{
                 assert!(true);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 2);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 2);
                 assert!(false)
             };
 
@@ -1101,7 +1107,7 @@ mod tests {
         parser.advance();
         
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut n);
+        parser.var_declaration(&mut compiler, true, &mut n);
         assert_eq!(n,1);        
 
         // Check that the next one is let
@@ -1118,7 +1124,7 @@ mod tests {
         parser.advance();
         
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut n);
+        parser.var_declaration(&mut compiler, true, &mut n);
         assert_eq!(n,1);
 
         // Check that the next one is let
@@ -1146,29 +1152,29 @@ mod tests {
             debug::chunk(chunk,"the_chunk".to_string());
                         
             // define X (should be 2.0)
-            if let Operation::PushNumber(v) = chunk.code()[0]{
+            if let (Operation::PushNumber(v),_) = chunk[0]{
                 assert_eq!(v,2.0);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 0);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 0);
                 assert!(false)
             };
 
             // Push y, should be Nil
-            if let Operation::PushNil = chunk.code()[1]{
+            if let (Operation::PushNil,_) = chunk[1]{
                 assert!(true);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 1);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 1);
                 assert!(false)
             };
 
             // Push z, should be true
-            if let Operation::PushBool(v) = chunk.code()[2]{
+            if let (Operation::PushBool(v),_) = chunk[2]{
                 assert!(v);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 2);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 2);
                 assert!(false)
             };
 
@@ -1193,7 +1199,7 @@ mod tests {
         let mut parser = Parser::new(&source);
         parser.advance();parser.advance();
         let mut n : usize = 0;
-        parser.var_declaration(&mut compiler, &mut n);
+        parser.var_declaration(&mut compiler, true, &mut n);
         assert_eq!(n,3);
 
 
@@ -1205,29 +1211,29 @@ mod tests {
             debug::chunk( chunk ,"the_chunk".to_string());
 
              // define X (should be 2.0)
-             if let Operation::PushNumber(v) = chunk.code()[0]{
+             if let (Operation::PushNumber(v),_) = chunk[0]{
                 assert_eq!(v,2.0);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 0);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 0);
                 assert!(false)
             };
 
             // Push y, should be Nil
-            if let Operation::PushNil = chunk.code()[1]{
+            if let (Operation::PushNil,_) = chunk[1]{
                 assert!(true);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 1);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 1);
                 assert!(false)
             };
 
             // Push z, should be True
-            if let Operation::PushBool(v) = chunk.code()[2]{
+            if let (Operation::PushBool(v),_) = chunk[2]{
                 assert!(v);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 2);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 2);
                 assert!(false)
             };
 
@@ -1292,7 +1298,7 @@ mod tests {
         // Check if there is a let, and consume it.
         assert!(parser.match_token(TokenType::Let));        
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut n);
+        parser.var_declaration(&mut compiler, true, &mut n);
         assert_eq!(n,1);
 
         // Check that the next one is {, and consume it
@@ -1305,7 +1311,7 @@ mod tests {
         // declare Z (check that there is a LET, and consume it first)
         assert!(parser.match_token(TokenType::Let));       
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut n);
+        parser.var_declaration(&mut compiler, true, &mut n);
         assert_eq!(n,1);
     }
 
@@ -1325,17 +1331,17 @@ mod tests {
             // Check the operations...
         
             // Push 3
-            if let Operation::PushNumber(v) = chunk.code()[0]{
+            if let (Operation::PushNumber(v),_) = chunk[0]{
                 assert_eq!(3.0,v);
             }else{assert!(false)};
 
             // set jump.
-            if let Operation::JumpIfFalse(v) = chunk.code()[1]{
+            if let (Operation::JumpIfFalse(v),_) = chunk[1]{
                 assert_eq!(2,v);
             }else{assert!(false)};
 
             // Pop variables.
-            if let Operation::Pop(n) = chunk.code()[2]{
+            if let (Operation::Pop(n),_) = chunk[2]{
                 assert_eq!(0,n);
             }else{assert!(false)};
 
@@ -1364,22 +1370,22 @@ mod tests {
 
 
             // Push 3
-            if let Operation::PushNumber(v) = chunk.code()[0]{
+            if let (Operation::PushNumber(v),_) = chunk[0]{
                 assert_eq!(3.0,v);
             }else{assert!(false)};
 
             // set jump.
-            if let Operation::JumpIfFalse(v) = chunk.code()[1]{
+            if let (Operation::JumpIfFalse(v),_) = chunk[1]{
                 assert_eq!(3,v);
             }else{assert!(false)};
 
             // Pop variables.
-            if let Operation::Pop(n) = chunk.code()[2]{
+            if let (Operation::Pop(n),_) = chunk[2]{
                 assert_eq!(0,n);
             }else{assert!(false)};
 
             // Jump back.
-            if let Operation::JumpBack(n) = chunk.code()[3]{
+            if let (Operation::JumpBack(n),_) = chunk[3]{
                 assert_eq!(3,n);
             }else{assert!(false)};
 
@@ -1405,42 +1411,42 @@ mod tests {
             debug::chunk(chunk, raw_source);
             
             // Push i
-            if let Operation::PushNil = chunk.code()[0]{
+            if let (Operation::PushNil,_) = chunk[0]{
                 assert!(true);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 0);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 0);
                 assert!(false)
             };
 
             // Push j
-            if let Operation::PushNil = chunk.code()[1]{
+            if let (Operation::PushNil,_) = chunk[1]{
                 assert!(true);
             }else{
-                let (ops, lines) = chunk.to_slices();
-                debug::operation(ops, lines, 1);
+                let ops_lines = chunk.as_slice();
+                debug::operation(ops_lines, 1);
                 assert!(false)
             };
 
             // Push 3
-            if let Operation::PushNumber(v) = chunk.code()[2]{
+            if let (Operation::PushNumber(v),_) = chunk[2]{
                 assert_eq!(3.0,v);
             }else{assert!(false)};
 
             // ... body happens
 
             // Pop vars from body        
-            if let Operation::Pop(_) = chunk.code()[3]{
+            if let (Operation::Pop(_),_) = chunk[3]{
                 assert!(true);
             }else{assert!(false)};
 
             // Pop vars from main scope        
-            if let Operation::Pop(_) = chunk.code()[4]{
+            if let (Operation::Pop(_),_) = chunk[4]{
                 assert!(true);
             }else{assert!(false)};
 
             // FOR LOOP
-            if let Operation::ForLoop(n_vars,length) = chunk.code()[5]{
+            if let (Operation::ForLoop(n_vars,length),_) = chunk[5]{
                 assert_eq!(n_vars,2);
                 assert_eq!(length,1); // The PopVars operation
             }else{assert!(false)};
@@ -1527,7 +1533,7 @@ mod tests {
 
             debug::chunk(chunk, raw_source);
 
-            let x = chunk.get_constant(0).unwrap()
+            let x = chunk.get_heap_value(0).unwrap()
                     .as_any()
                     .downcast_ref::<Function>()
                     .expect("Wasn't a Function");
@@ -1543,7 +1549,7 @@ mod tests {
             let ch = chunk.code();
             if let Operation::PushHeapRef(v) = &ch[0] {
                 assert_eq!(*v, 0 as usize);                
-                match chunk.get_constant(*v){
+                match chunk.get_heap_value(*v){
                     Some(_s)=>{
                         
                         
@@ -1552,7 +1558,7 @@ mod tests {
                 }
                 
             }else {
-                let (code,lines) = chunk.to_slices();
+                let (code,lines) = chunk.as_slice();
                 print!("Found wrong operation... ");
                 debug::operation(&code, &lines, 1);
                 panic!("wrong operation")
@@ -1591,7 +1597,7 @@ mod tests {
             assert_eq!(x_token.source_text(&source),format!("x"));
             assert!(compiler.var_is_in_scope(&x_token, &source));
 
-            let x = chunk.get_constant(0).unwrap()
+            let x = chunk.get_heap_value(0).unwrap()
                     .as_any()
                     .downcast_ref::<Function>()
                     .expect("Wasn't a Function");

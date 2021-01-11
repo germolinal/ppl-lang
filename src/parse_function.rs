@@ -169,7 +169,6 @@ pub fn binary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
         TokenType::Slash => {
             parser.emit_byte(Operation::Divide)
         },
-
         TokenType::EqualEqual => {
             parser.emit_byte(Operation::Equal)
         },
@@ -212,6 +211,7 @@ pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
 
 /// Parses an anonymous function
 pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Function>{
+    panic!("function should discriminate between global and local variables");
     // starts from the (), so it covers
     // both 'let x = fn(){}' and 'fn ID(){}'
     // this becomes { let args[]; ...body...  }
@@ -244,8 +244,8 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
     let mut n_vars : usize = 0;
     parser.show_tokens("before var_declaration()");
     match parser.current().token_type(){
-        // There are variables... declare them
-        TokenType::Identifier => parser.var_declaration(&mut compiler, &mut n_vars),
+        // There are variables... declare them (but DO NOT define them)
+        TokenType::Identifier => parser.var_declaration(&mut compiler, false, &mut n_vars),
         // Nothing to declare
         TokenType::RightParen => {},
         _ => {
@@ -287,13 +287,19 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
     
     // Check if the function returns anything. If not, 
     // Return Nil.
-    let (code,lines) = new_func.chunk().unwrap().to_slices();
-    let c_len = code.len();
-    if c_len == 0 || Operation::Return != code[c_len - 1]{
-        let last_line = if c_len == 0 { 0 } else { lines[c_len - 1] };
-        let c = new_func.mut_chunk().unwrap();
-        c.write_operation(Operation::PushNil, last_line);
-        c.write_operation(Operation::Return, last_line);
+    let new_chunk = new_func.mut_chunk().unwrap();
+    let c_len = new_chunk.len();    
+    let last_line : usize;
+    if c_len == 0 {
+        // Nothing in the function... push return NIL
+        new_chunk.push((Operation::PushNil, 0));
+        new_chunk.push((Operation::Return, 0));
+    }else {
+        let (last_op,last_line) = new_chunk[c_len - 1];
+        if Operation::Return != last_op {            
+            new_chunk.push((Operation::PushNil, last_line));
+            new_chunk.push((Operation::Return, last_line));
+        }
     }
 
 
@@ -327,16 +333,17 @@ pub fn variable(can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
         Some(i)=>{
 
             if can_assign && parser.match_token(TokenType::Equal){
-                println!("Assigning to Var {}!", i);
                 parser.expression(compiler);
                 parser.emit_byte(Operation::SetLocal(i))
             }else{
-                println!("Getting var {}!", i);
                 parser.emit_byte(Operation::GetLocal(i));
             }
             
         },
-        None => panic!("Could not find Variable '{}'", var_name.source_text(parser.source() ))
+        None => {
+            panic!("Search Global is not yet implemented in parse_function::variable()");
+            //panic!("Could not find Variable '{}' in current scope", var_name.source_text(parser.source() ))
+        }
     }
     
 }

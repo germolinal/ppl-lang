@@ -52,13 +52,21 @@ impl VM {
         
         let mut frame_n = self.call_frames.len() - 1;
         
-        loop {          
+        loop {  
+            // This variable allows some operation to stop
+            // advancing through the code ONCE. It is used
+            // when calling functions (because we need to start
+            // at 0, not 1, which is what would happen if we advanced)        
+            let mut advance = true;
+
+            // Get some general data
             let first_call_frame_slot = self.call_frames[frame_n].first_slot();
             let ip = self.call_frames[frame_n].ip();
 
             if ip >= self.call_frames[frame_n].n_operations().unwrap(){                
                 break;
             }   
+
             /*****************************/
             /* Dissassemble when developing */
             /*****************************/
@@ -73,8 +81,8 @@ impl VM {
                 print!("]\n");
 
                 // Report operation 
-                let (code,lines) = self.call_frames[frame_n].code_lines().unwrap();               
-                debug::operation(code, lines, ip);                
+                let code_lines = self.call_frames[frame_n].code_lines().unwrap();               
+                debug::operation(code_lines, ip);                
             }
             /*****************************/
             /*****************************/
@@ -407,13 +415,13 @@ impl VM {
                                         .function()
                                         .chunk()
                                         .unwrap();
-                        
-                        let function = match chunk.get_constant(i)
+                        println!("FUNCTION {}", i);
+                        let function = match chunk.get_heap_value(i)
                             .unwrap()
                             .as_any()
                             .downcast_ref::<Function>(){
                                 Some(f)=>f.clone_rc(),
-                                None => return InterpretResult::RuntimeError(format!("Trying to call from a '{}' object as if it was a function", chunk.get_constant(i).unwrap().type_name()))
+                                None => return InterpretResult::RuntimeError(format!("Trying to call from a '{}' object as if it was a function", chunk.get_heap_value(i).unwrap().type_name()))
                             };
                         
                             let f_name = function.get_name();
@@ -426,6 +434,7 @@ impl VM {
                                 let first_slot = self.stack.len() - n_vars;                  
                                 self.push_call_frame(CallFrame::new(first_slot,function));                        
                                 frame_n += 1;
+                                advance = false;
                                 //self.run();
                                 //self.pop_call_frame().unwrap();
                             },
@@ -459,7 +468,9 @@ impl VM {
             }// end of match
 
             // Advance one space
-            self.call_frames[frame_n].jump_forward(1);
+            if advance {
+                self.call_frames[frame_n].jump_forward(1);
+            }
 
         }// end of loop.
 

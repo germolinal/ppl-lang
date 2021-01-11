@@ -29,7 +29,7 @@ impl CallFrame{
         if self.function.is_native(){
             return Err(format!("Trying to get the number of operations out of function '{}' which is native", self.function.get_name()));
         }else{
-            Ok(self.function.chunk().unwrap().n_operations())
+            Ok(self.function.chunk().unwrap().len())
         }
     }
 
@@ -37,11 +37,11 @@ impl CallFrame{
         &self.function
     }
 
-    pub fn code_lines(&self)->Result<(&[Operation],&[usize]), String>{
+    pub fn code_lines(&self)->Result<&[(Operation, usize)], String>{
         if self.function.is_native(){
             return Err(format!("Trying to get the code and lines out of function '{}' which is native", self.function.get_name()));
         }else{
-            Ok(self.function.chunk().unwrap().to_slices())
+            Ok(self.function.chunk().unwrap().as_slice())
         }
     }
 
@@ -50,9 +50,9 @@ impl CallFrame{
         if self.function.is_native() {
             return Err(format!("Trying to get Operation from function '{}' which is native", self.function.get_name()));
         }else{
-            let (code,lines)=self.function.chunk().unwrap().to_slices();
+            let ops_lines =self.function.chunk().unwrap().as_slice();
             let i = self.ip;
-            Ok((code[i], lines[i]))
+            Ok(ops_lines[i])
         }
     }
 

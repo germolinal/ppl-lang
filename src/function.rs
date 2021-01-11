@@ -7,6 +7,7 @@ use crate::value_trait::ValueTrait;
 use crate::values::Value;
 use crate::chunk::Chunk;
 use crate::vm::VM;
+use crate::heap_list::HeapList;
 
 pub enum Function{
     Native(Rc<NativeFn>),
@@ -61,12 +62,12 @@ impl Function {
         }
     }
     
-    pub fn push_constant(&mut self,v: Box<dyn ValueTrait>)->usize{
+    pub fn push_constant(&mut self,v: Box<dyn ValueTrait>, heap: &mut HeapList)->usize{
         match self{
             Function::Native(_)=>panic!("Trying to push constant to a native function"),
             Function::Script(f)=> {
                 match Rc::get_mut(f){
-                    Some(a)=>a.push_to_heap(v),
+                    Some(a)=>a.push_to_heap(v, heap),
                     None => panic!("Trying push_constant to a Function already shared")
                 }                                
             }

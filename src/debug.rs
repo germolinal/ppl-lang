@@ -1,6 +1,6 @@
 #[cfg(debug_assertions)]
 pub mod debug {
-    use crate::chunk::Chunk;
+    //use crate::chunk::Chunk;
     use crate::operations::*;
     use crate::token::*;
     
@@ -25,14 +25,12 @@ pub mod debug {
     /// Disassembles an Operation
     /// # Arguments:
     /// * op: The operation to be unassembled
-    pub fn operation(ops: &[Operation], lines: &[usize],offset: usize) {        
+    pub fn operation(ops: &[(Operation, usize)],offset: usize) {        
         //let ops = chunk.code();
-        let op = &ops[offset];
-        let ln = lines[offset];
-        //let ln = chunk.lines()[offset];
+        let (op, ln) = &ops[offset];                
         print!("{:04} ", offset);    
         
-        if ln > 0 {
+        if *ln > 0 {
             print!("(ln {})\t", ln)
         }else {
             print!("\t/\t")
@@ -179,15 +177,15 @@ pub mod debug {
     /// Prints the instruction set into the 
     /// terminal... not really used outside of
     /// development environments    
-    pub fn chunk(chunk : &Chunk, name: String){
+    pub fn chunk(chunk : &Vec<(Operation, usize)>, name: String){
         
         println!("== {} ==\n", name);
     
-        let lines : &[usize]= &chunk.lines();
-        let ops : &[Operation]= &chunk.code();
+        //let lines : &[usize]= &chunk.lines();
+        //let ops : &[Operation]= &chunk.code();
 
-        for i in 0..ops.len(){
-            operation(ops, lines, i);
+        for i in 0..chunk.len(){
+            operation(chunk.as_slice(), i);
         }
     }
 

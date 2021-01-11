@@ -1,5 +1,6 @@
 use crate::chunk::Chunk;
 use crate::value_trait::ValueTrait;
+use crate::heap_list::HeapList;
 
 pub struct ScriptFn {
     pub name: String,
@@ -15,13 +16,14 @@ impl ScriptFn {
     pub fn new(name: &String)->Self{
         Self {
             name: name.clone(),
-            chunk: Chunk::new(),
+            chunk: Chunk::with_capacity(1024),
             n_args: 0
         }
     }
     
-    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>)->usize{
-        self.chunk.push_to_heap(v)
+    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>, heap: &mut HeapList)->usize{
+        //self.chunk.push_to_heap(v)
+        heap.push(v)
     }
 
     pub fn chunk(&self)->&Chunk{
