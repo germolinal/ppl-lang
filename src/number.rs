@@ -20,9 +20,11 @@ impl ValueTrait for Number {
         Value::Number(*self)
     }
 
+    
     fn as_any(&self) -> &dyn Any{
         self
     }
+    
 
     fn negate(&self)->Result<Value,String>{        
         Ok(Value::Number(-self))

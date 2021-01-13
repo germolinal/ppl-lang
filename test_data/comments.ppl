@@ -12,7 +12,7 @@ let other_literal = 21
 some_literal = other_literal
 
 fn double(x){
-    return 2*x
+    return 2*x*2
 }
 
 let f1 = fn(a, b, f){

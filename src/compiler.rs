@@ -2,9 +2,11 @@ use crate::options::Options;
 use crate::token::Token;
 use crate::function::Function;
 use crate::parser::Parser;
+use crate::package::{Packages};
+use crate::heap_list::HeapList;
 
-pub struct Local {
-    pub name: Token,
+pub struct Local<'a> {
+    pub name: Token<'a>,
     pub depth: usize,
     initialized: bool    
 }
@@ -15,26 +17,26 @@ pub enum CompilerOptions {
     Optimize
 }
 
-pub struct Compiler {
+pub struct Compiler<'a> {
 
-    pub locals: Vec<Local>,    
+    pub locals: Vec<Local<'a>>,    
     pub scope_depth: usize,
 
     pub optimize: bool,    
 }
 
 
-pub fn compile(source: &Vec<u8>) -> Option<Function> {            
+pub fn compile<'a>(source: &'a Vec<u8>, heap: &mut HeapList, packages: &mut Packages) -> Option<Function> {            
     let compiler_options : Options<CompilerOptions> = vec![];
 
     let mut compiler = Compiler::new(compiler_options);
     let mut parser = Parser::new(source);
 
-    return parser.program(&mut compiler);
+    return parser.program(&mut compiler, heap, packages);
 
 }
 
-impl Compiler {
+impl <'a>Compiler<'a> {
 
     /// Creates an empty compiler.
     pub fn new( options: Options<CompilerOptions> )->Self{        
@@ -130,7 +132,7 @@ impl Compiler {
 
     /// Pushes a Local into the locals vector in the 
     /// compiler. It will warn when the vector was resized.
-    pub fn add_local(&mut self, var_name: &Token){
+    pub fn add_local(&mut self, var_name: Token<'a>){
 
         #[cfg(debut_assertions)]
         if self.local_count == self.locals.capacity(){
@@ -138,7 +140,7 @@ impl Compiler {
         }
 
         self.locals.push(Local{
-            name: *var_name,
+            name: var_name,
             depth: self.scope_depth,            
             initialized: false
         });
@@ -172,17 +174,18 @@ mod tests {
         let token = Token{
             line: 1,
             length: 2,
-            start: 0,            
+            start: 0,
+            txt: &src[0..2],            
             token_type: TokenType::Identifier,
         };
 
         assert_eq!(compiler.locals.len(),0);
 
-        compiler.add_local(&token);
+        compiler.add_local(token);
 
         assert_eq!(compiler.locals.len(),1);
         assert_eq!(compiler.locals[0].depth, 0);
-        assert_eq!(compiler.locals[0].name.source_text(&src), "He");
+        assert_eq!(compiler.locals[0].name.source_text(), "He");
         assert!(!compiler.locals[0].initialized);
     }
 
@@ -194,18 +197,19 @@ mod tests {
         let token = Token{
             line: 1,
             length: 2,
-            start: 0,            
+            start: 0,
+            txt: &src[0..2],            
             token_type: TokenType::Identifier,
         };
 
         assert_eq!(compiler.locals.len(),0);
 
         assert!(!compiler.var_is_in_scope(&token, &src));
-        compiler.add_local(&token);
+        compiler.add_local(token);
 
         assert_eq!(compiler.locals.len(),1);
         assert_eq!(compiler.locals[0].depth, 0);
-        assert_eq!(compiler.locals[0].name.source_text(&src), "He");
+        assert_eq!(compiler.locals[0].name.source_text(), "He");
         assert!(!compiler.locals[0].initialized);
 
         assert!(compiler.var_is_in_scope(&token, &src));
@@ -220,21 +224,24 @@ mod tests {
         let token = Token{
             line: 1,
             length: 2,
-            start: 0,            
+            start: 0,
+            txt: &src[0..2],            
             token_type: TokenType::Identifier,
         };
 
         let token2 = Token{
             line: 1,
             length: 2,
-            start: 2,            
+            start: 2,
+            txt: &src[2..4],            
             token_type: TokenType::Identifier,
         };
 
         let not_added = Token{
             line: 1,
             length: 3,
-            start: 0,            
+            start: 0,
+            txt: &src[0..3],            
             token_type: TokenType::Identifier,
         };
 
@@ -243,17 +250,17 @@ mod tests {
         assert!(!compiler.var_is_in_scope(&token, &src));
         assert!(!compiler.var_is_in_scope(&token2, &src));
         
-        compiler.add_local(&token);
-        compiler.add_local(&token2);
+        compiler.add_local(token);
+        compiler.add_local(token2);
 
         assert_eq!(compiler.locals.len(),2);
 
         assert_eq!(compiler.locals[0].depth, 0);
-        assert_eq!(compiler.locals[0].name.source_text(&src), "He");
+        assert_eq!(compiler.locals[0].name.source_text(), "He");
         assert!(!compiler.locals[0].initialized);
 
         assert_eq!(compiler.locals[1].depth, 0);
-        assert_eq!(compiler.locals[1].name.source_text(&src), "ll");
+        assert_eq!(compiler.locals[1].name.source_text(), "ll");
         assert!(!compiler.locals[1].initialized);
 
         assert_eq!(compiler.get_local(&token, &src).unwrap(),0);

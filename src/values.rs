@@ -157,9 +157,11 @@ impl ValueTrait for Value  {
         }
     }
     
+    
     fn as_any(&self) -> &dyn Any{
         self
     }
+    
 
 
     fn not(&self)->Result<Value,String>{

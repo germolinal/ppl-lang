@@ -12,10 +12,10 @@ pub struct ScriptFn {
 
 impl ScriptFn {
 
-    
-    pub fn new(name: &String)->Self{
+    pub fn new(name: &[u8])->Self{
+                                
         Self {
-            name: name.clone(),
+            name: std::str::from_utf8(name).unwrap().to_string(),
             chunk: Chunk::with_capacity(1024),
             n_args: 0
         }
@@ -34,9 +34,11 @@ impl ScriptFn {
         &mut self.chunk
     }
     
-    pub fn set_name(&mut self,name:&String){        
+    /*
+    pub fn set_name(&mut self,name: &String){        
         self.name = name.clone();
     }
+    */
 
     pub fn set_n_args(&mut self, n_args: usize){
         self.n_args = n_args

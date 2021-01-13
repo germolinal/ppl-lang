@@ -24,7 +24,7 @@ impl Function {
         }
     }
 
-    pub fn new_script(name: &String)->Function{
+    pub fn new_script(name: &[u8])->Function{
         Function::Script(Rc::new(ScriptFn::new(name)))
     }
 
@@ -91,19 +91,17 @@ impl Function {
 impl ValueTrait for Function {
     // Basic i/o
     fn to_string(&self)->String {
-        format!("fn {}()",match self {
-            Function::Native(v)=>&v.name,
-            Function::Script(v)=>&v.name
-        })
+        format!("fn {}()",self.get_name())
     }
 
     fn type_name(&self)->String{
         format!("Function")
     }
 
+    
     fn as_any(&self) -> &dyn Any{
         self
-    }
+    }    
 
     // Copy and clone
     fn clone_to_value(&self)->Value{

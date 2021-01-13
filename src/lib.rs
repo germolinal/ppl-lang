@@ -19,10 +19,10 @@ mod token;
 mod parse_function;
 
 mod parser;
-mod heap_list;
 //mod handler;
-mod package;
 
+pub mod package;
+pub mod heap_list;
 pub mod call_frame;
 pub mod vm;
 pub mod compiler;

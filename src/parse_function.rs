@@ -1,4 +1,4 @@
-
+use crate::heap_list::HeapList;
 use crate::parser::*;
 use crate::token::*;
 use crate::operations::*;
@@ -11,13 +11,13 @@ use crate::compiler::Compiler;
 /// Processes a unitary operation.
 /// 
 /// Does not use the 'can_assign'
-pub fn unary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
+pub fn unary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
         
     // Get the unary Token
     let token_type = parser.previous().token_type();
 
     // Consume the expresion after
-    parser.parse_precedence(compiler, Precedence::Unary);
+    parser.parse_precedence(compiler, Precedence::Unary, heap);
 
     // Emit the operation
     match token_type{
@@ -33,15 +33,15 @@ pub fn unary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
     };
 }
 
-pub fn string(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
+pub fn string<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
     /*
-    let v = parser.previous().source_text(parser.source());                
+    let v = parser.previous().source_text();                
     parser.emit_byte(Operation::PushString(Box::new(v)));
     */
     unimplemented!();
 }
 
-pub fn array(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
+pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
     unimplemented!();
     /*
     //parser.advance();
@@ -66,8 +66,8 @@ pub fn array(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
 }
 
 /// Parses a number... does not use the 'can_assign'
-pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
-    let v = parser.previous().source_text(parser.source());            
+pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
+    let v = parser.previous().source_text();            
     let the_v = match v.parse::<f64>(){
         Ok(v)=>v,
         Err(msg)=>{
@@ -79,7 +79,7 @@ pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
 
 
 /// Parses an indexation (i.e. x[i]) operation
-pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
+pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
     unimplemented!();
 }
 
@@ -87,14 +87,14 @@ pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler){
 /// pushes arguments separated by commas
 /// e.g. arg1, arg2, arg3,...
 /// 
-fn arg_list(parser: &mut Parser, compiler: &mut Compiler, n: &mut usize){
+fn arg_list<'a>(parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, n: &mut usize){
     
    
     // Left Paren has been consumed
     loop {
-        
+                
         // Evaluate an expression
-        parser.expression(compiler);
+        parser.expression(compiler, heap);
         // Increase count
         *n+=1;
 
@@ -111,7 +111,7 @@ fn arg_list(parser: &mut Parser, compiler: &mut Compiler, n: &mut usize){
 /// Parses a call...
 ///
 /// Does not use the 'can_assign'
-pub fn call(_can_assign: bool, parser:&mut Parser, compiler: &mut Compiler){
+pub fn call<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
     
     
     // Push arguments
@@ -119,7 +119,7 @@ pub fn call(_can_assign: bool, parser:&mut Parser, compiler: &mut Compiler){
 
     // If not empty arglist
     if !parser.check(TokenType::RightParen){
-        arg_list(parser, compiler, &mut n_args);    
+        arg_list(parser, compiler, heap, &mut n_args);    
     }
     if !parser.consume(TokenType::RightParen){
         parser.error_at_current(format!("Expected ')' after argument list in function call"));
@@ -133,9 +133,9 @@ pub fn call(_can_assign: bool, parser:&mut Parser, compiler: &mut Compiler){
 /// Parses grouping (e.g., '(x*y/z)' )
 /// 
 /// Does not use the 'can_assign'
-pub fn grouping(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
+pub fn grouping<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
     // left paren has been consumed
-    parser.expression(compiler);
+    parser.expression(compiler, heap);
     if !parser.consume(TokenType::RightParen) {
         parser.error_at_current(format!("Expected ')' after expression"));
     }
@@ -144,14 +144,14 @@ pub fn grouping(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler)
 /// Parses binary operation.
 /// 
 /// Does not use the 'can_assign'
-pub fn binary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
+pub fn binary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
     // Get the Binary
     let operator_type = parser.previous().token_type();
 
     // Compile what is after
     let rule = parser.get_rule(operator_type);
     match rule.next_precedence{
-        Some(precedence)=>parser.parse_precedence(compiler, precedence),
+        Some(precedence)=>parser.parse_precedence(compiler, precedence, heap),
         None => parser.internal_error_at_current(format!("No next precedence found for binary operation"))
     }
 
@@ -201,7 +201,7 @@ pub fn binary(_can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
 /// Parses literals. 
 /// 
 /// Does not use the 'can_assign'
-pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
+pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
     match parser.previous().token_type(){
         TokenType::False => parser.emit_byte(Operation::PushBool(false)),
         TokenType::True => parser.emit_byte(Operation::PushBool(true)),        
@@ -209,9 +209,9 @@ pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler){
     }
 }
 
-/// Parses an anonymous function
-pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Function>{
-    panic!("function should discriminate between global and local variables");
+/// Parses an anonymous function                    
+pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<'a>, heap: &mut HeapList)->Option<Function>{
+        
     // starts from the (), so it covers
     // both 'let x = fn(){}' and 'fn ID(){}'
     // this becomes { let args[]; ...body...  }
@@ -232,27 +232,27 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
 
     // Create a new function, and plug it to the 
     // parser
-    let new_func = Function::new_script(&name);
+    let new_func = Function::new_script(name);
     parser.set_function(new_func); 
 
-    // Reset compiler
-    let mut compiler = Compiler::new(vec![]);
+    
+    // Reset compiler (so it does not capture variables ot of its scope)
+    let mut clean_compiler = Compiler::new(vec![]); 
 
     // Open main scope
-    parser.begin_scope(&mut compiler);
+    parser.begin_scope(&mut clean_compiler);
 
     let mut n_vars : usize = 0;
     parser.show_tokens("before var_declaration()");
     match parser.current().token_type(){
         // There are variables... declare them (but DO NOT define them)
-        TokenType::Identifier => parser.var_declaration(&mut compiler, false, &mut n_vars),
+        TokenType::Identifier => parser.var_declaration(&mut clean_compiler, heap, false, &mut n_vars),
         // Nothing to declare
         TokenType::RightParen => {},
         _ => {
             parser.error_at_current(format!("Expecting ')' or Variable Identifiers after '(' in function declaration."));        
             return None;
         }
-
     }
     
     
@@ -268,7 +268,7 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
     }
 
     // Open, process, and close body    
-    parser.block(&mut compiler);
+    parser.block(&mut clean_compiler, heap);
     
     // No end_scope()... this is done 
     // when processing the Return operation
@@ -288,8 +288,7 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
     // Check if the function returns anything. If not, 
     // Return Nil.
     let new_chunk = new_func.mut_chunk().unwrap();
-    let c_len = new_chunk.len();    
-    let last_line : usize;
+    let c_len = new_chunk.len();        
     if c_len == 0 {
         // Nothing in the function... push return NIL
         new_chunk.push((Operation::PushNil, 0));
@@ -307,25 +306,27 @@ pub fn function(parser:&mut Parser, name: &String, _c: &mut Compiler)->Option<Fu
     parser.set_function(old_func);
     new_func.set_n_args(n_vars);
     
-    return Some(new_func);
+    return Some(new_func);    
 }
+
 
 /// Anonymous function parser
 /// 
 /// Does not use the 'can_assign'
-pub fn function_value(_can_assign: bool, parser:&mut Parser, compiler: &mut Compiler){
+pub fn function_value<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
     
-    if let Some(f) = function(parser,&format!("<Anonymous Function>"), compiler){        
+    if let Some(f) = function(parser, "<Anonymous Function>".as_bytes(), compiler, heap){        
         // f is now the function.
         let v = Box::new(f);
-        if let Some(i) = parser.push_to_heap(v){                
-            parser.emit_byte(Operation::PushHeapRef(i));
-        }        
+        let i = heap.push(v);      
+
+        parser.emit_byte(Operation::PushHeapRef(i));
     }
 }
 
 
-pub fn variable(can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
+
+pub fn variable<'a>(can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
     // search back for a variable with the same name
     let var_name = parser.previous();
         
@@ -333,7 +334,7 @@ pub fn variable(can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
         Some(i)=>{
 
             if can_assign && parser.match_token(TokenType::Equal){
-                parser.expression(compiler);
+                parser.expression(compiler, heap);
                 parser.emit_byte(Operation::SetLocal(i))
             }else{
                 parser.emit_byte(Operation::GetLocal(i));
@@ -341,8 +342,15 @@ pub fn variable(can_assign: bool, parser: &mut Parser, compiler: &mut Compiler){
             
         },
         None => {
-            panic!("Search Global is not yet implemented in parse_function::variable()");
-            //panic!("Could not find Variable '{}' in current scope", var_name.source_text(parser.source() ))
+            unimplemented!();
+            /*
+            if can_assign && parser.match_token(TokenType::Equal){
+                parser.expression(compiler, heap);
+                parser.emit_byte(Operation::SetGlobal(*var_name))
+            }else{
+                parser.emit_byte(Operation::GetGlobal(*var_name));
+            }
+            */
         }
     }
     

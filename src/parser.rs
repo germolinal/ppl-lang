@@ -4,12 +4,13 @@ use crate::scanner::*;
 use crate::token::*;
 use crate::parse_function::*;
 use crate::function::Function;
-use crate::value_trait::ValueTrait;
 use crate::operations::Operation;
 use crate::compiler::Compiler;
 use crate::heap_list::HeapList;
+use crate::package::{/*Package,*/ Packages};
 
-pub type Chunk = Vec<(Operation, usize)>;
+
+
 
 #[repr(u8)] 
 #[derive(PartialEq,PartialOrd)]
@@ -28,19 +29,19 @@ pub enum Precedence{
 }
 
 
-type ParseFn = fn(can_assign: bool, &mut Parser, &mut Compiler);
+type ParseFn<'a> = fn(can_assign: bool, &mut Parser<'a>, &mut Compiler<'a>, heap: &mut HeapList);
 
-pub struct ParseRule {
-    pub prefix: Option<ParseFn>,
-    pub infix: Option<ParseFn>,
+pub struct ParseRule<'a> {
+    pub prefix: Option<ParseFn<'a>>,
+    pub infix: Option<ParseFn<'a>>,
     pub precedence: Precedence,
     pub next_precedence: Option<Precedence>
 }
 
 
 pub struct Parser<'a>{
-    current: Token,
-    previous: Token,
+    current: Token<'a>,
+    previous: Token<'a>,
     had_error: bool,
     panic_mode: bool,
     scanner: Scanner<'a>,    
@@ -53,10 +54,10 @@ impl <'a>Parser<'a>{
 
     pub fn new(source: &'a Vec<u8>)->Self{
         let scanner = Scanner::new(source);
-        let previous = Token::new(&scanner,TokenType::EOF);
-        let current = Token::new(&scanner,TokenType::EOF);
+        let previous = scanner.make_token(TokenType::EOF);
+        let current = scanner.make_token(TokenType::EOF);
         
-        let main_function = Function::new_script(&"main".to_string());
+        let main_function = Function::new_script("main".as_bytes());
         
         Self{
             scanner: scanner,
@@ -102,18 +103,7 @@ impl <'a>Parser<'a>{
         }        
     }
 
-    
-    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>, heap: &mut HeapList)->Option<usize>{
-        match &mut self.current_function{
-            Some(f)=>{
-                Some(heap.push(v))
-            }
-            None => {
-                self.error_no_current_function();
-                None              
-            }
-        }     
-    }
+        
     
 
     /* UTILITY FUNCTIONS */
@@ -121,21 +111,22 @@ impl <'a>Parser<'a>{
     #[cfg(debug_assertions)]
     #[allow(dead_code)]
     pub fn show_tokens(&self, msg: &str){
-        println!("at {} == previous: {} | current: {}", msg, debug::token(self.previous,self.scanner.source()), debug::token(self.current, self.scanner.source()));
+        println!("at {} == previous: {} | current: {}", msg, debug::token(self.previous), debug::token(self.current));
     }
     
     
-    pub fn previous(&self)->&Token{
+    pub fn previous(&self)->&Token<'a>{
         &self.previous
     }
 
-    pub fn current(&self)->&Token{
+    pub fn current(&self)->&Token<'a>{
         &self.current
     }
     
     pub fn advance(&mut self){
         self.previous = self.current;        
         self.current = self.scanner.scan_token();
+
         loop{
             match self.current.token_type(){
                 TokenType::Error => {
@@ -184,7 +175,7 @@ impl <'a>Parser<'a>{
     }
 
         
-    pub fn get_rule(&self, ttype: TokenType)->ParseRule{
+    pub fn get_rule(&self, ttype: TokenType)->ParseRule<'a>{
         match ttype{
             TokenType::RightParen | TokenType::RightBracket |            
             TokenType::LeftBrace | TokenType::RightBrace |
@@ -381,7 +372,7 @@ impl <'a>Parser<'a>{
         }
     }
 
-    pub fn parse_precedence(&mut self, compiler: &mut Compiler, precedence: Precedence){          
+    pub fn parse_precedence(&mut self, compiler: &mut Compiler<'a>, precedence: Precedence, heap: &mut HeapList){          
         self.advance();
         let rule = match self.get_rule(self.previous.token_type()).prefix {
             Some(r) => r,
@@ -394,12 +385,12 @@ impl <'a>Parser<'a>{
         let can_assign : bool = precedence <= Precedence::Assignment;
 
         // Run the rule
-        rule(can_assign, self, compiler);
+        rule(can_assign, self, compiler, heap);
 
         while precedence <= self.get_rule(self.current.token_type()).precedence {
             self.advance();
             match self.get_rule(self.previous.token_type()).infix{
-                Some(r)=>r(can_assign, self, compiler),
+                Some(r)=>r(can_assign, self, compiler, heap),
                 None => self.internal_error_at_current(format!("No infix rule!"))
             }
         }                
@@ -410,13 +401,13 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// program -> declaration* EOF
-    pub fn program(&mut self, compiler: &mut Compiler) -> Option<Function> {            
+    pub fn program(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, _packages: &mut Packages) -> Option<Function> {            
         // Prime the pump
         self.advance();
         //self.advance();
 
         while !self.match_token(TokenType::EOF) && !self.had_error{
-            self.declaration(compiler);
+            self.declaration(compiler, heap);
         }
                 
 
@@ -443,7 +434,7 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// declaration -> classDecl | funDecl | varDecl | statement
-    fn declaration(&mut self, compiler: &mut Compiler){    
+    fn declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){    
         self.show_tokens("declaration() - start");
         match self.current.token_type(){
             TokenType::Class => {
@@ -452,15 +443,15 @@ impl <'a>Parser<'a>{
             },
             TokenType::Function => {
                 self.advance();                
-                self.fn_declaration(compiler);
+                self.fn_declaration(compiler, heap);
             },
             TokenType::Let => {
                 self.advance();
                 let mut n : usize= 0;
-                self.var_declaration(compiler, true, &mut n);
+                self.var_declaration(compiler, heap, true, &mut n);
             },
             _ => {                                
-                self.statement(compiler);
+                self.statement(compiler, heap);
             }
         }
     }
@@ -470,28 +461,35 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar
     /// function -> fn IDENTIFIER (varlist) BLOCK
-    fn fn_declaration(&mut self , compiler: &mut Compiler, heap: &mut HeapList){
-        // fn has been consumed.
-        let func_name = if self.consume(TokenType::Identifier){
-            self.previous
-        }else{
-            return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",self.previous.source_text(self.source()) ))
-        };
-
-        // declare the variable.
-        self.declare_variable(compiler);
+    fn fn_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
         
+        // fn has been consumed.
+        if self.consume(TokenType::Identifier){
 
-        let func = match function(self, &func_name.source_text(self.source()), compiler){
-            Some(f)=>f,
-            None => return
-        };
+            // declare the variable.
+            self.declare_variable(compiler);
+            
+            let func_name = self.previous;
 
-        // Push constant.
-        if let Some(i) = self.push_to_heap(Box::new(func), heap){
+            let func  = match function(self, func_name.txt, compiler, heap){
+                Some(f)=>f,
+                None => return
+            };
+    
+            // Push constant.
+            let i = heap.push(Box::new(func));        
+    
             // Register the function
             self.emit_byte(Operation::PushHeapRef(i));            
-        }
+
+
+        }else{
+            return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'",self.previous.source_text() ))
+        };
+                
+
+        
+        
 
     }
     
@@ -500,13 +498,13 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// var_declaration -> "let" IDENTIFIER ("=" expression)
-    pub fn var_declaration(&mut self, compiler: &mut Compiler, define: bool, n_declared_vars : &mut usize){        
+    pub fn var_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, define: bool, n_declared_vars : &mut usize){        
         
         // Get the token representing the name
         if !self.consume(TokenType::Identifier){
-            let txt = self.previous.source_text(self.source());
-            return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'", txt ))
-        };        
+            let txt = self.previous.source_text().to_string();
+            return self.error_at_current(format!("Expecting identifier after 'let'. Found '{}'", txt ));
+        }       
 
         // Declare the variable
         self.declare_variable(compiler);
@@ -515,7 +513,7 @@ impl <'a>Parser<'a>{
             // Define 
             if self.match_token(TokenType::Equal){                                                
                 // Put value of expression on the stack                        
-                self.expression(compiler);                             
+                self.expression(compiler, heap);                             
             }else{
                 // Or NIL.
                 self.emit_byte(Operation::PushNil);            
@@ -531,7 +529,7 @@ impl <'a>Parser<'a>{
         
         // Check if there is another variable afterwards
         if self.consume(TokenType::Comma) {
-            self.var_declaration(compiler, define, n_declared_vars);
+            self.var_declaration(compiler, heap, define, n_declared_vars);
         }    
         
     }
@@ -542,16 +540,16 @@ impl <'a>Parser<'a>{
     /// within the same scope_depth in the compiler. If 
     /// not, it pushes the Local into the locals vector
     /// in the compiler.
-    fn declare_variable(&mut self, compiler: &mut Compiler){
-        let var_name = &self.previous;
+    fn declare_variable(&mut self, compiler: &mut Compiler<'a>){
+        let var_name = self.previous();
                     
         if compiler.var_is_in_scope(var_name, self.source()){
             //self.error_at_current(format!("A variable called '{}' already exists in this scope", var_name.source_text(self.source())));
-            panic!("A variable called '{}' already exists in this scope", var_name.source_text(self.source()));
+            panic!("A variable called '{}' already exists in this scope", var_name.source_text());
             //return;
         }
                 
-        compiler.add_local(var_name)
+        compiler.add_local(*var_name)
             
     }
 
@@ -559,14 +557,14 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// while_statement -> while EXPRESSION BLOCK
-    fn while_statement(&mut self, compiler: &mut Compiler){
+    fn while_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
         let while_start = match self.chunk_len(){
             Some(i)=>i,
             None => return
         };
 
         // Compile expression (puts a boolean on the stack)
-        self.expression(compiler);
+        self.expression(compiler, heap);
         
         // This is patched later in this function
         self.emit_byte(Operation::JumpIfFalse(0)); 
@@ -584,7 +582,7 @@ impl <'a>Parser<'a>{
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
-        self.block(compiler);        
+        self.block(compiler, heap);        
         self.end_scope(compiler);
 
         // Mark the end
@@ -605,10 +603,10 @@ impl <'a>Parser<'a>{
     /// Compiles an If statement
     /// # EBNF Grammar:
     /// if_statement -> if EXPRESSION BLOCK
-    fn if_statement(&mut self, compiler: &mut Compiler){
+    fn if_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
         
         // Compile expression (puts a boolean on the stack)
-        self.expression(compiler);
+        self.expression(compiler, heap);
 
         // This is patched later in this function        
         self.emit_byte(Operation::JumpIfFalse(0)); 
@@ -626,7 +624,7 @@ impl <'a>Parser<'a>{
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
-        self.block(compiler);        
+        self.block(compiler, heap);        
         self.end_scope(compiler);
 
         // Mark the end
@@ -648,7 +646,7 @@ impl <'a>Parser<'a>{
                 Some(i)=>i,
                 None => return
             };
-            self.statement(compiler);
+            self.statement(compiler, heap);
 
             // Mark the end
             let body_end = match self.chunk_len(){
@@ -668,7 +666,7 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// for_statement -> for IDENTIFIER in EXPRESSION  BLOCK
-    fn for_statement(&mut self, compiler: &mut Compiler){
+    fn for_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
                 
         // Open the main scope for this for statement.
         self.begin_scope(compiler);
@@ -676,7 +674,7 @@ impl <'a>Parser<'a>{
         // consume declare the variables
         self.show_tokens("for_statement - Before VAR Declaration");
         let mut n_declared_vars : usize = 0;
-        self.var_declaration(compiler, true, &mut n_declared_vars);        
+        self.var_declaration(compiler, heap, true, &mut n_declared_vars);        
         self.show_tokens("for_statement - AFTER VAR Declaration");
         println!(" ----> Declared {}",n_declared_vars);
         
@@ -688,7 +686,7 @@ impl <'a>Parser<'a>{
         
         // Evaluate the value to iterate over... put it at the end 
         // of the stack.
-        self.expression(compiler);
+        self.expression(compiler, heap);
         self.show_tokens("for_statement - AFTER Expression()");
 
         
@@ -705,7 +703,7 @@ impl <'a>Parser<'a>{
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
-        self.block(compiler);        
+        self.block(compiler, heap);        
         self.end_scope(compiler);
 
         // Mark the end of the scope
@@ -728,7 +726,7 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// statement -> expression | forStmt | ifStmt | returnStmt | whileStmt| block ;
-    fn statement(&mut self, compiler: &mut Compiler){  
+    fn statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){  
                 
         match self.current.token_type(){
             TokenType::LeftBrace => {
@@ -736,34 +734,34 @@ impl <'a>Parser<'a>{
                 self.advance();
                 self.show_tokens("statement - LeftBrace after advance()");
                 self.begin_scope(compiler);
-                self.block(compiler);
+                self.block(compiler, heap);
                 self.show_tokens("statement - after block()");
                 self.end_scope(compiler);
             },
             TokenType::For => {
                 self.advance();
-                self.for_statement(compiler);
+                self.for_statement(compiler, heap);
             },
             TokenType::If =>{
                 self.advance();
-                self.if_statement(compiler);
+                self.if_statement(compiler, heap);
             },
             TokenType::Return =>{
                 // only one value can be returned
                 self.advance();
-                self.expression(compiler);
+                self.expression(compiler, heap);
                 self.emit_byte(Operation::Return)
             },
             TokenType::While =>{
                 self.advance();
-                self.while_statement(compiler);
+                self.while_statement(compiler, heap);
             },
             TokenType::EOF=>{
                 return
             },
             _ => {
                 // Expression-statement
-                self.expression(compiler);
+                self.expression(compiler, heap);
                 self.emit_byte(Operation::Pop(1));
             }
         }
@@ -773,19 +771,19 @@ impl <'a>Parser<'a>{
     /// Compiles an expression
     /// # EBFN Grammar:
     /// expression -> literal | unary | binary | grouping;
-    pub fn expression(&mut self, compiler: &mut Compiler){                    
-        self.parse_precedence(compiler, Precedence::Assignment);
+    pub fn expression(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){                    
+        self.parse_precedence(compiler, Precedence::Assignment, heap);
     }
 
 
     /// Opens a scope, after a Left Brace
-    pub fn begin_scope(&mut self, compiler: &mut Compiler){                          
+    pub fn begin_scope(&mut self, compiler: &mut Compiler<'a>){                          
         compiler.scope_depth += 1;        
     }
 
     /// Closes a scope and emits all the necessary
     /// PopVar operations, removing the local variables
-    pub fn end_scope(&mut self, compiler: &mut Compiler){    
+    pub fn end_scope(&mut self, compiler: &mut Compiler<'a>){    
         // reduce scope
         compiler.scope_depth -= 1;
             
@@ -803,14 +801,14 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// block -> "{" declaration* "}"
-    pub fn block(&mut self, compiler: &mut Compiler){ 
+    pub fn block(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){ 
         // LEFT BRACE HAS BEEN CONSUMED ALREADY
         println!("====== <<<< BEGIN");
         
 
         self.show_tokens("block - before loop");       
         while !self.check(TokenType::RightBrace) && !self.check(TokenType::EOF){
-            self.declaration(compiler);
+            self.declaration(compiler, heap);
         }
         self.show_tokens("block - after loop");
         if !self.consume(TokenType::RightBrace){
@@ -822,7 +820,7 @@ impl <'a>Parser<'a>{
     }
 
     /// Marks a variable in the compiler as initialized
-    fn define_variable(&mut self, compiler: &mut Compiler){        
+    fn define_variable(&mut self, compiler: &mut Compiler<'a>){        
         compiler.mark_initialized();        
     }
     
@@ -852,7 +850,7 @@ impl <'a>Parser<'a>{
         match token.token_type(){
             TokenType::EOF => eprint!(" at end"),
             TokenType::Error => {/*ignore*/},
-            _ => eprint!(" at '{}'", token.source_text(self.scanner.source()))
+            _ => eprint!(" at '{}'", token.source_text())
         }
         
         eprintln!(": {}", msg);
@@ -876,7 +874,7 @@ impl <'a>Parser<'a>{
         match token.token_type(){
             TokenType::EOF => eprint!(" at end"),
             TokenType::Error => {/*ignore*/},
-            _ => eprint!(" at '{}'", token.source_text(self.scanner.source()))
+            _ => eprint!(" at '{}'", token.source_text())
         }
         
         eprintln!(": {}", msg);
@@ -898,6 +896,7 @@ mod tests {
     use super::*;    
     use crate::vm::VM;
     use crate::chunk::Chunk;
+    use crate::value_trait::ValueTrait;
     
 
     // this is used in some calses below.
@@ -972,11 +971,12 @@ mod tests {
 
         match parser.previous.token_type(){
             TokenType::Number => {},
-            _ => {panic!("Expecting Number, found {}", debug::token(parser.previous, parser.scanner.source()))}
+            _ => {panic!("Expecting Number, found {}", debug::token(parser.previous))}
         }
         
+        let mut heap = HeapList::new();
         
-        number(false, &mut parser,&mut compiler);        
+        number(false, &mut parser, &mut compiler, &mut heap);        
         if let (Operation::PushNumber(found), _) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.0,*found);            
         }else{
@@ -993,11 +993,11 @@ mod tests {
 
         match parser.previous.token_type(){
             TokenType::Number => {},
-            _ => {panic!("Expecting Number, found {}", debug::token(parser.previous, parser.scanner.source()))}
+            _ => {panic!("Expecting Number, found {}", debug::token(parser.previous))}
         }
         
-        number(false, &mut parser,&mut compiler);
-        number(false, &mut parser,&mut compiler);        
+        number(false, &mut parser,&mut compiler, &mut heap);
+        number(false, &mut parser,&mut compiler, &mut heap);        
         if let (Operation::PushNumber(found),_) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.1,*found);            
         }else{
@@ -1008,6 +1008,7 @@ mod tests {
 
     use crate::values::*;
     use crate::call_frame::CallFrame;
+    use std::collections::HashMap;
 
     #[test]
     fn test_expression(){
@@ -1016,7 +1017,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler){
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk, format!("test_expression chunck"));
@@ -1024,7 +1028,7 @@ mod tests {
             let mut vm = VM::new();   
 
             vm.push_call_frame(CallFrame::new(0,f.clone_rc()));
-            vm.run();            
+            vm.run(&mut heap);            
 
             
             
@@ -1051,7 +1055,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler){
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             
             let chunk = f.chunk().unwrap();
             
@@ -1097,6 +1104,9 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
+        let mut heap = HeapList::new();
+        //let mut packages : Packages = HashMap::new();
+
         // prime the pump (done in self.program())
         parser.advance();
 
@@ -1107,7 +1117,7 @@ mod tests {
         parser.advance();
         
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
         assert_eq!(n,1);        
 
         // Check that the next one is let
@@ -1124,7 +1134,7 @@ mod tests {
         parser.advance();
         
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
         assert_eq!(n,1);
 
         // Check that the next one is let
@@ -1147,7 +1157,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler){                          
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){                          
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk,"the_chunk".to_string());
                         
@@ -1197,15 +1210,18 @@ mod tests {
         // 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
         parser.advance();parser.advance();
         let mut n : usize = 0;
-        parser.var_declaration(&mut compiler, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
         assert_eq!(n,3);
 
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             let chunk = f.chunk().unwrap();
 
             debug::chunk( chunk ,"the_chunk".to_string());
@@ -1252,15 +1268,19 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        parser.program(&mut compiler);
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        parser.program(&mut compiler, &mut heap, &mut packages);
 
         let x = Token{
             line: 1,
             length: 1,
             start: 4,
+            txt: &source[4..5],
             token_type: TokenType::Identifier
         };
-        assert_eq!(x.source_text(&source), format!("x"));
+        assert_eq!(x.source_text(), format!("x"));
 
         assert!(compiler.var_is_in_scope(&x, &source));
 
@@ -1268,9 +1288,10 @@ mod tests {
             line: 1,
             length: 1,
             start: 18,
+            txt: &source[18..19],
             token_type: TokenType::Identifier
         };
-        assert_eq!(y.source_text(&source), format!("y"));
+        assert_eq!(y.source_text(), format!("y"));
         assert!(!compiler.var_is_in_scope(&y, &source));
     }
     
@@ -1282,7 +1303,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        parser.program(&mut compiler);
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        parser.program(&mut compiler, &mut heap, &mut packages);
         assert!(!parser.had_error);
 
         // Now do it more slowly
@@ -1290,6 +1314,9 @@ mod tests {
         // prime the pump (done in self.program())
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
+        let mut heap = HeapList::new();
+        //let mut packages : Packages = HashMap::new();
+
         parser.advance();
 
         
@@ -1298,7 +1325,7 @@ mod tests {
         // Check if there is a let, and consume it.
         assert!(parser.match_token(TokenType::Let));        
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
         assert_eq!(n,1);
 
         // Check that the next one is {, and consume it
@@ -1306,12 +1333,12 @@ mod tests {
                 
 
         /* CONSUME BLOCK */
-        parser.block(&mut compiler);
+        parser.block(&mut compiler, &mut heap);
 
         // declare Z (check that there is a LET, and consume it first)
         assert!(parser.match_token(TokenType::Let));       
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
         assert_eq!(n,1);
     }
 
@@ -1324,7 +1351,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler){
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
 
             let chunk = f.chunk().unwrap();
 
@@ -1362,8 +1392,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
         
-        if let Some(f) = parser.program(&mut compiler){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             // Check the operations...
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk, raw_source);
@@ -1405,7 +1437,10 @@ mod tests {
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler){
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             // Check the operations...
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk, raw_source);
@@ -1499,8 +1534,11 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut compiler = Compiler::new(vec![]);
-        let mut parser = Parser::new(&source);        
-        if let Some(_) = parser.program(&mut compiler){
+        let mut parser = Parser::new(&source);   
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(_) = parser.program(&mut compiler, &mut heap, &mut packages){
         }else{
             assert!(false);
         }
@@ -1512,8 +1550,11 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut compiler = Compiler::new(vec![]);
-        let mut parser = Parser::new(&source);        
-        if let Some(_) = parser.program(&mut compiler){
+        let mut parser = Parser::new(&source);  
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(_) = parser.program(&mut compiler, &mut heap, &mut packages){
         }else{
             assert!(false);
         }
@@ -1521,46 +1562,47 @@ mod tests {
 
     #[test]
     fn test_function_expression(){
-        let raw_source = "let x = fn(a) { \nlet i = fn(){} \nreturn i }".to_string();
+        let raw_source = "let x = fn(a) { let i = fn(){} return i }".to_string();
         let source : Vec<u8> = raw_source.clone().into_bytes();
 
         let mut compiler = Compiler::new(vec![]);
-        let mut parser = Parser::new(&source);        
-        if let Some(main) = parser.program(&mut compiler){
+        let mut parser = Parser::new(&source);  
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(main) = parser.program(&mut compiler, &mut heap, &mut packages){
             assert!(!parser.had_error);
 
             let chunk = main.chunk().unwrap();
 
             debug::chunk(chunk, raw_source);
 
-            let x = chunk.get_heap_value(0).unwrap()
+            let x = heap.get(0).unwrap()                    
                     .as_any()
                     .downcast_ref::<Function>()
                     .expect("Wasn't a Function");
-
-            if let Function::Script(s) = x {
-
-                debug::chunk(s.chunk(), format!("{}", x.to_string()));
-
-            }else{
-                assert!(false);
-            }
-
-            let ch = chunk.code();
-            if let Operation::PushHeapRef(v) = &ch[0] {
-                assert_eq!(*v, 0 as usize);                
-                match chunk.get_heap_value(*v){
-                    Some(_s)=>{
+                    
+                    if let Function::Script(s) = x {
                         
+                        debug::chunk(s.chunk(), format!("{}", x.to_string()));
+                        
+                    }else{
+                        assert!(false);
+                    }
+
+            
+            if let (Operation::PushHeapRef(v),_) = chunk[0] {
+                assert_eq!(v, 1 as usize);                
+                match heap.get(v){
+                    Some(_s)=>{
                         
                     },
                     None => {assert!(false)}                    
                 }
                 
-            }else {
-                let (code,lines) = chunk.as_slice();
+            }else {                
                 print!("Found wrong operation... ");
-                debug::operation(&code, &lines, 1);
+                debug::operation(chunk.as_slice(), 1);
                 panic!("wrong operation")
             }
         }else{
@@ -1575,12 +1617,16 @@ mod tests {
 
     #[test]
     fn test_function_declaration(){
-        let raw_source = "fn x(a,b,c) { }".to_string();
+        let raw_source = "fn x (a,b,c) { }".to_string();
         let source : Vec<u8> = raw_source.clone().into_bytes();
 
+        
         let mut compiler = Compiler::new(vec![]);
-        let mut parser = Parser::new(&source);        
-        if let Some(f) = parser.program(&mut compiler){
+        let mut parser = Parser::new(&source); 
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             assert!(!parser.had_error);
             let chunk = f.chunk().unwrap();
 
@@ -1589,15 +1635,16 @@ mod tests {
             let x_token = Token{
                 line: 1,
                 length: 1,
-                start: 3,            
+                start: 3,
+                txt: &source[3..4],            
                 token_type: TokenType::Identifier,
             };
             assert_eq!(compiler.local_count(),1);
-            println!("locals[0] -> '{}'", compiler.locals[0].name.source_text(&source));
-            assert_eq!(x_token.source_text(&source),format!("x"));
+            println!("locals[0] -> '{}'", compiler.locals[0].name.source_text());
+            assert_eq!(x_token.source_text(),format!("x"));
             assert!(compiler.var_is_in_scope(&x_token, &source));
 
-            let x = chunk.get_heap_value(0).unwrap()
+            let x = heap.get(0).unwrap()            
                     .as_any()
                     .downcast_ref::<Function>()
                     .expect("Wasn't a Function");
@@ -1607,14 +1654,13 @@ mod tests {
 
             }else{
                 assert!(false);
-            }
+            }            
                     
 
         }else{
             assert!(false)
-        }                        
-
-                        
+        }           
+                                
     }
 
     
@@ -1625,8 +1671,11 @@ mod tests {
         let source : Vec<u8> = raw_source.clone().into_bytes();
 
         let mut compiler = Compiler::new(vec![]);
-        let mut parser = Parser::new(&source);        
-        if let Some(f) = parser.program(&mut compiler){
+        let mut parser = Parser::new(&source);
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             assert!(!parser.had_error);
             let chunk = f.chunk().unwrap();
 
@@ -1640,15 +1689,18 @@ mod tests {
         let source : Vec<u8> = raw_source.clone().into_bytes();
 
         let mut compiler = Compiler::new(vec![]);
-        let mut parser = Parser::new(&source);        
-        if let Some(f) = parser.program(&mut compiler){
+        let mut parser = Parser::new(&source);  
+        let mut heap = HeapList::new();
+        let mut packages : Packages = HashMap::new();
+
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
             assert!(!parser.had_error);
             let chunk = f.chunk().unwrap();
             
             debug::chunk(chunk, raw_source);
             
             // the function x() should be there... nothing else
-            assert_eq!(chunk.heap().len(),1);              
+            assert_eq!(heap.len(),1);              
 
         } else {
             assert!(false)

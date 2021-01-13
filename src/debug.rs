@@ -238,11 +238,11 @@ pub mod debug {
     }
     
     /// Retrieves a token in debug mode
-    pub fn token(token: Token, source:&Vec<u8>) -> String{
+    pub fn token(token: Token) -> String{
     
         let token_name = token_type(token.token_type());
                 
-        format!("{} '{}'", token_name,token.source_text(source) )
+        format!("{} '{}'", token_name,token.source_text() )
     }
        
 }

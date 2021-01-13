@@ -21,6 +21,7 @@ pub trait ValueTrait {
     fn get_next(&self)->Option<(Value,Value)>{
         None
     }
+    
 
     // Operators
     fn not(&self)->Result<Value,String>{
@@ -79,5 +80,7 @@ pub trait ValueTrait {
             Err(e)=>Err(e),
         }      
     }
+
+    
     
 }

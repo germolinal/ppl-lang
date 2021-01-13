@@ -11,7 +11,7 @@ pub struct Package {
 
 pub type Packages = HashMap<String,Package>;
 
-impl Package{
+impl Package {
     pub fn new(name: &String)->Self{
         Self {
             name: name.clone(),
@@ -19,12 +19,9 @@ impl Package{
         }
     }
 
-    pub fn register_rust_func(&mut self, name: &str, func: NativeFnType )->Result<(),String> {
+    pub fn register_rust_func(&mut self, name: &[u8], func: NativeFnType )->Result<(),String> {
         
-        let native_fn = NativeFn {
-            name: name.to_string(),
-            func: func
-        };
+        let native_fn = NativeFn::new(name, func);
         
         let function: Function = Function::Native(Rc::new(native_fn));
 
@@ -34,7 +31,7 @@ impl Package{
 
     pub fn register_func(&mut self, func: Function)->Result<(),String> {
         
-        let func_name = func.get_name().clone();
+        let func_name = format!("{}",func.get_name());
         let f_name_2 = func_name.clone();
         match self.functions.insert(func_name,func){
             None => Ok(()),

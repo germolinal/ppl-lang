@@ -1,3 +1,4 @@
+//use crate::token::Token;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
@@ -26,6 +27,8 @@ pub enum Operation {
     
     GetLocal(usize),
     SetLocal(usize),
+    //GetGlobal(Token<'a>),
+    //SetGlobal(Token<'a>),
 
     Pop(usize),
     DefineVars(usize),

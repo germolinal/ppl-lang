@@ -4,6 +4,7 @@ use crate::values::*;
 use crate::value_trait::ValueTrait;
 use crate::call_frame::CallFrame;
 use crate::function::Function;
+use crate::heap_list::HeapList;
 
 #[cfg(debug_assertions)]
 use crate::debug::*;
@@ -47,7 +48,7 @@ impl VM {
     
     
     /// Runs the last CallFrame in the call_stack
-    pub fn run( &mut self ) -> InterpretResult {
+    pub fn run( &mut self, heap: &mut HeapList ) -> InterpretResult {
                 
         
         let mut frame_n = self.call_frames.len() - 1;
@@ -410,22 +411,20 @@ impl VM {
                     let f_ref = self.stack[ self.stack.len() - n_vars - 1 ];
                     if let Value::HeapRef(i) = f_ref {
                                          
-                        // get the function from the surrounding function (i.e. the current one)
-                        let chunk = self.call_frames[frame_n]
-                                        .function()
-                                        .chunk()
-                                        .unwrap();
-                        println!("FUNCTION {}", i);
-                        let function = match chunk.get_heap_value(i)
-                            .unwrap()
+                        // get the function from the surrounding function (i.e. the current one)                        
+                        println!("FUNCTION {}", i);                        
+                        
+                        let function = match heap.get(i).unwrap()
                             .as_any()
                             .downcast_ref::<Function>(){
                                 Some(f)=>f.clone_rc(),
-                                None => return InterpretResult::RuntimeError(format!("Trying to call from a '{}' object as if it was a function", chunk.get_heap_value(i).unwrap().type_name()))
+                                None => return InterpretResult::RuntimeError(format!("Trying to call from a '{}' object as if it was a function", heap.get(i).unwrap().type_name()))
                             };
                         
                             let f_name = function.get_name();
-                            debug::chunk(function.chunk().unwrap(), f_name.clone());
+                        
+                            debug::chunk(function.chunk().unwrap(), format!("{}",f_name));
+                            
 
                         match function.call(self,n_vars){
                             Ok(_n_returns)=>{
@@ -569,21 +568,22 @@ mod tests {
     fn test_negate(){
         
         let v = 1.2;        
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_negate".as_bytes());
         {
             let c = function.mut_chunk().unwrap();
             
             // Over a number... should work
-            c.write_operation(Operation::PushNumber(v), 123);                
-            c.write_operation(Operation::Negate, 124);
-            c.write_operation(Operation::Return, 0);                        
+            c.push((Operation::PushNumber(v), 123));                
+            c.push((Operation::Negate, 124));
+            c.push((Operation::Return, 0));                        
         }
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0, function.clone_rc() ));
         
         //let c = function.chunk().unwrap();
-        assert!(vm.run().is_ok()); 
+        assert!(vm.run(&mut heap).is_ok()); 
 
         let v2 = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(v2,-v);
@@ -597,36 +597,38 @@ mod tests {
         
         // Over a Float... should not work
         let v = 1.2;        
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_not".as_bytes());
         {
             let c = function.mut_chunk().unwrap();
     
-            c.write_operation(Operation::PushNumber(v), 123);                
-            c.write_operation(Operation::Not, 124);
-            c.write_operation(Operation::Return, 0);                        
+            c.push((Operation::PushNumber(v), 123));                
+            c.push((Operation::Not, 124));
+            c.push((Operation::Return, 0));                        
 
         }
                 
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run().is_ok());
+        assert!(!vm.run(&mut heap).is_ok());
         
                     
 
         // Over a boolean... should work
         let v = true;
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_not".as_bytes());
         {
             let c = function.mut_chunk().unwrap();
-            c.write_operation(Operation::PushBool(v), 123);                
-            c.write_operation(Operation::Not, 124);
-            c.write_operation(Operation::Return, 0);                        
+            c.push((Operation::PushBool(v), 123));                
+            c.push((Operation::Not, 124));
+            c.push((Operation::Return, 0));                        
     
         }        
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run().is_ok());
+        assert!(vm.run(&mut heap).is_ok());
                         
         
     }
@@ -639,20 +641,21 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_add".as_bytes());
         {
             let chunk = function.mut_chunk().unwrap();
                     
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushNumber(b), 123);                        
-            chunk.write_operation(Operation::Add, 124);
-            chunk.write_operation(Operation::Return, 0);                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushNumber(b), 123));                        
+            chunk.push((Operation::Add, 124));
+            chunk.push((Operation::Return, 0));                        
         }
         
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run().is_ok());                                
+        assert!(vm.run(&mut heap).is_ok());                                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a+b,c);
@@ -662,19 +665,20 @@ mod tests {
         let a = 11.2;
         let b = true;
         
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_add".as_bytes());
         {
             let chunk = function.mut_chunk().unwrap();
             
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushBool(b), 123);                        
-            chunk.write_operation(Operation::Add, 124);
-            chunk.write_operation(Operation::Return, 0);                                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushBool(b), 123));                        
+            chunk.push((Operation::Add, 124));
+            chunk.push((Operation::Return, 0));                                        
         }
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run().is_ok());                             
+        assert!(!vm.run(&mut heap).is_ok());                             
 
     }
 
@@ -685,19 +689,20 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_subtract".as_bytes());
         {
             let chunk = function.mut_chunk().unwrap();
                     
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushNumber(b), 123);                        
-            chunk.write_operation(Operation::Subtract, 124);
-            chunk.write_operation(Operation::Return, 0);                                
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushNumber(b), 123));                        
+            chunk.push((Operation::Subtract, 124));
+            chunk.push((Operation::Return, 0));                                
         }
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run().is_ok());                              
+        assert!(vm.run(&mut heap).is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a-b,c);
@@ -708,23 +713,24 @@ mod tests {
         let a = 12.;
         let b = true;
 
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_subtract".as_bytes());
         {
             let chunk = function.mut_chunk().unwrap();
             
             
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushBool(b), 123);                        
-            chunk.write_operation(Operation::Subtract, 124);
-            chunk.write_operation(Operation::Return, 0);                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushBool(b), 123));                        
+            chunk.push((Operation::Subtract, 124));
+            chunk.push((Operation::Return, 0));                        
 
         }
         
         
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run().is_ok());                             
+        assert!(!vm.run(&mut heap).is_ok());                             
     }
 
     #[test]
@@ -734,22 +740,23 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut function = Function::new_script(&format!("test_multiply"));
+        let mut function = Function::new_script("test_multiply".as_bytes());
         {
 
             let chunk = function.mut_chunk().unwrap();
             
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushNumber(b), 123);                        
-            chunk.write_operation(Operation::Multiply, 124);
-            chunk.write_operation(Operation::Return, 0);                                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushNumber(b), 123));                        
+            chunk.push((Operation::Multiply, 124));
+            chunk.push((Operation::Return, 0));                                        
         }
         
 
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
 
-        assert!(vm.run().is_ok());                
+        assert!(vm.run(&mut heap).is_ok());                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a*b,c);
@@ -759,20 +766,21 @@ mod tests {
         let a = 12.2;
         let b = true;
         
-        let mut function = Function::new_script(&format!("test_multiply"));
+        let mut function = Function::new_script("test_multiply".as_bytes());
         {
 
             let chunk = function.mut_chunk().unwrap();
             
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushBool(b), 123);                        
-            chunk.write_operation(Operation::Multiply, 124);
-            chunk.write_operation(Operation::Return, 0);                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushBool(b), 123));                        
+            chunk.push((Operation::Multiply, 124));
+            chunk.push((Operation::Return, 0));                        
         }
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));                
-        assert!(!vm.run().is_ok());                              
+        assert!(!vm.run(&mut heap).is_ok());                              
 
     }
 
@@ -783,21 +791,21 @@ mod tests {
         let a = 1.2;
         let b = 12.21231;
         
-        let mut function = Function::new_script(&format!("test_divide"));
+        let mut function = Function::new_script("test_divide".as_bytes());
         {
 
             let chunk = function.mut_chunk().unwrap();
             
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushNumber(b), 123);                        
-            chunk.write_operation(Operation::Divide, 124);
-            
-            chunk.write_operation(Operation::Return, 0);                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushNumber(b), 123));                        
+            chunk.push((Operation::Divide, 124));            
+            chunk.push((Operation::Return, 0));                        
         }
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run().is_ok());                              
+        assert!(vm.run(&mut heap).is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a / b,c);
@@ -807,19 +815,20 @@ mod tests {
         let a = 12.1;
         let b = true;
         
-        let mut function = Function::new_script(&format!("test_negate"));
+        let mut function = Function::new_script("test_divide".as_bytes());
         {
             let chunk = function.mut_chunk().unwrap();
             
-            chunk.write_operation(Operation::PushNumber(a), 123);                        
-            chunk.write_operation(Operation::PushBool(b), 123);                        
-            chunk.write_operation(Operation::Divide, 124);
-            chunk.write_operation(Operation::Return, 0);                        
+            chunk.push((Operation::PushNumber(a), 123));                        
+            chunk.push((Operation::PushBool(b), 123));                        
+            chunk.push((Operation::Divide, 124));
+            chunk.push((Operation::Return, 0));                        
 
         }
         
         let mut vm = VM::new();
+        let mut heap = HeapList::new();
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run().is_ok());                                
+        assert!(!vm.run(&mut heap).is_ok());                                
     }
 }
