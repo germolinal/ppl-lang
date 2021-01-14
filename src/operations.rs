@@ -2,7 +2,7 @@
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Operation {
     Return,
     Negate,
@@ -27,8 +27,8 @@ pub enum Operation {
     
     GetLocal(usize),
     SetLocal(usize),
-    //GetGlobal(Token<'a>),
-    //SetGlobal(Token<'a>),
+    GetGlobal(usize),
+    //SetGlobal(usize),
 
     Pop(usize),
     DefineVars(usize),

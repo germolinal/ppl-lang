@@ -98,6 +98,9 @@ impl ValueTrait for Function {
         format!("Function")
     }
 
+    fn is_function(&self)->bool{
+        true
+    }
     
     fn as_any(&self) -> &dyn Any{
         self

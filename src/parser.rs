@@ -59,7 +59,7 @@ impl <'a>Parser<'a>{
         
         let main_function = Function::new_script("main".as_bytes());
         
-        Self{
+        Self {
             scanner: scanner,
             had_error: false,
             panic_mode: false,
@@ -148,11 +148,13 @@ impl <'a>Parser<'a>{
     }
 
 
+    /// Checks that the current token is of a certain type
     pub fn check(&self, t: TokenType)->bool{
         self.current.token_type() == t
     }
 
-    
+    /// Checks that the current token is of a certain type
+    /// and, if it is, advances.
     pub fn match_token(&mut self, t: TokenType) -> bool{
         if !self.check(t) {
             return false;
@@ -511,7 +513,10 @@ impl <'a>Parser<'a>{
 
         if define {
             // Define 
-            if self.match_token(TokenType::Equal){                                                
+            if self.match_token(TokenType::Equal){ 
+                if self.check(TokenType::Function){
+                    panic!("Please define functions as fn ID(){}")
+                }                                               
                 // Put value of expression on the stack                        
                 self.expression(compiler, heap);                             
             }else{

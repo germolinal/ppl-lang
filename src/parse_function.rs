@@ -297,7 +297,7 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
         let (last_op,last_line) = new_chunk[c_len - 1];
         if Operation::Return != last_op {            
             new_chunk.push((Operation::PushNil, last_line));
-            new_chunk.push((Operation::Return, last_line));
+            new_chunk.push((Operation::Return,  last_line));
         }
     }
 
@@ -328,9 +328,9 @@ pub fn function_value<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &
 
 pub fn variable<'a>(can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
     // search back for a variable with the same name
-    let var_name = parser.previous();
+    //let var_name = parser.previous();
         
-    match compiler.get_local(&var_name, parser.source()){
+    match compiler.get_local(parser.previous(), parser.source()){
         Some(i)=>{
 
             if can_assign && parser.match_token(TokenType::Equal){
@@ -342,15 +342,19 @@ pub fn variable<'a>(can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Co
             
         },
         None => {
-            unimplemented!();
-            /*
+            // Global... needs to be a function.            
             if can_assign && parser.match_token(TokenType::Equal){
-                parser.expression(compiler, heap);
-                parser.emit_byte(Operation::SetGlobal(*var_name))
+                panic!("Trying to reassign a global function");
             }else{
-                parser.emit_byte(Operation::GetGlobal(*var_name));
+                match heap.get_global_function(parser.previous()){
+                    Some(i)=> parser.emit_byte(Operation::GetGlobal(i)),
+                    None => {
+                        panic!("Variable {} not found", parser.previous().source_text());
+                    }
+                }
+                
             }
-            */
+            
         }
     }
     

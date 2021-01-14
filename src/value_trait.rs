@@ -17,6 +17,10 @@ pub trait ValueTrait {
         Err(format!("Cannot Call type '{}'... it is not a Function", self.type_name()))
     }
 
+    fn is_function(&self)->bool{
+        false
+    }
+
     // Loops.
     fn get_next(&self)->Option<(Value,Value)>{
         None

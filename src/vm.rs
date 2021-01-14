@@ -130,22 +130,49 @@ impl VM {
                 Operation::PushNil=>{
                     self.push(Value::Nil)
                 }                                   
-                Operation::GetLocal(i)=>{  
-                    println!("first slot: {}", first_call_frame_slot);
+                Operation::GetLocal(i)=>{                      
                     let absolute_position = i + first_call_frame_slot;
                     let local = self.stack[absolute_position];
                     // Check if it has been initialized
                     if local.is_nil() {
-                        panic!(format!("Variable '{}' has not been initialized", "TODO: Add &source in GetLocal operation" ));
+                        panic!(format!("Trying to use an uninitialized variable"));
                     }
+                    // Let the HEAP know that we are referencing this
+                    if let Value::HeapRef(i) = local {
+                        heap.add_reference(i);
+                    }
+
                     // Push it    
-                    self.push(self.stack[absolute_position]);                                                                                                      
+                    self.push(local);                                                                                                      
                 },
                 Operation::SetLocal(i)=>{      
                     let absolute_position = i + first_call_frame_slot;
                     let last = self.stack.len()-1;
+                    
+                    // If this value, which will be removed, pointed to 
+                    // the heap, let the heap know
+                    if let Value::HeapRef(heap_ref) = self.stack[absolute_position] {
+                        heap.drop_reference(heap_ref);
+                    }
+
+                    // Check if the value to be assigned is a Function...
+                    // we don't allow that.                    
+                    if let Value::HeapRef(heap_ref) = self.stack[last]{
+                        if heap.get(heap_ref).unwrap().is_function(){
+                            panic!("Cannot assign a function into a variable");
+                        }
+                    }
+
+                    // Replace
                     self.stack[absolute_position] = self.stack[last];//self.pop().unwrap();                                                                                                                 
-                },                
+                },    
+                Operation::GetGlobal(i)=>{                    
+                    if !heap.get(i).unwrap().is_function(){
+                        panic!("Trying to get a reference to a non-function global variable")
+                    }
+                    heap.add_reference(i);
+                    self.push(Value::HeapRef(i));
+                },         
                 Operation::Pop(n)=>{                    
                     for _ in 0..n {
                         self.pop().unwrap();

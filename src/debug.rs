@@ -116,6 +116,9 @@ pub mod debug {
             Operation::SetLocal(i)=>{
                 return println!("OP_SET_LOCAL | {}",i);
             },
+            Operation::GetGlobal(i)=>{
+                return println!("OP_GET_LOCAL | {}",i);
+            },
             Operation::Pop(n)=>{
                 return println!("OP_POP | {}",n);
             },

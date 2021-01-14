@@ -1,9 +1,11 @@
 
 use crate::value_trait::ValueTrait;
+use crate::function::Function;
+use crate::token::Token;
 
 struct Element {
-    value: Box<dyn ValueTrait>,
-    n_refs: usize,
+    pub value: Box<dyn ValueTrait>,
+    pub n_refs: usize,
 }
 
 pub struct HeapList {
@@ -123,6 +125,30 @@ impl HeapList {
 
         return ret;
 
+    }
+
+    pub fn get_global_function<'a>(&self, fn_name_token: &Token<'a>)->Option<usize>{
+        let fn_name = fn_name_token.source_text();
+        for i in 0..self.elements.len(){
+            let element = &self.elements[i];
+
+            if let Some(e) = element{                
+                let v = &e.value;
+                if v.is_function(){
+                    let function = match v.as_any()
+                            .downcast_ref::<Function>(){
+                                Some(f)=>f.clone_rc(),
+                                None => panic!("Not sure what happened... but it was on HeapList, trying to get a global function")
+                            };
+
+                    if function.get_name() == fn_name{
+                        return Some(i);
+                    }
+                }
+            }
+                
+        }
+        None
     }
     
 }

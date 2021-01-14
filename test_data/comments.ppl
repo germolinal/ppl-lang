@@ -12,15 +12,22 @@ let other_literal = 21
 some_literal = other_literal
 
 fn double(x){
-    return 2*x*2
+    return 2*x
 }
 
-let f1 = fn(a, b, f){
-    return f(a) + b 
+let f = double
+
+fn f1(a, b){
+
+    fn x (){
+        return f(1)
+    }
+
+    return f(a) + b + x()
 }
 
 
-let y = f1(1111, 2222, double)
+let y = f1(1111, 2222)
 
 
 //let x=1,y,z
