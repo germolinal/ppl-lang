@@ -121,19 +121,11 @@ impl ValueTrait for Function {
                 if n_args != f.n_args {
                     return Err(format!("Incorrect number of arguments. Found {}, required {}", n_args, f.n_args));
                 }
-                return Ok(1);
-                /*
-                unimplemented!();
-                if let InterpretResult::Ok(n) = vm.run(){                    
-                    return Ok(n);
-                }else{
-                    return Err(format!("Error when running function '{}'", f.name));
-                }
-                */
+                return Ok(1);                
             },
             Function::Native(f)=>{
                 // Get the function
-                let rust_fn = f.func;                
+                let rust_fn = f.func;                                
                 // Call it
                 Ok(rust_fn(vm,n_args))
             }

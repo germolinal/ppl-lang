@@ -136,12 +136,12 @@ impl HeapList {
                 let v = &e.value;
                 if v.is_function(){
                     let function = match v.as_any()
-                            .downcast_ref::<Function>(){
-                                Some(f)=>f.clone_rc(),
-                                None => panic!("Not sure what happened... but it was on HeapList, trying to get a global function")
-                            };
+                        .downcast_ref::<Function>(){
+                            Some(f)=>f.clone_rc(),
+                            None => panic!("Not sure what happened... but it was on HeapList, trying to get a global function")
+                        };
 
-                    if function.get_name() == fn_name{
+                    if function.get_name() == fn_name {
                         return Some(i);
                     }
                 }

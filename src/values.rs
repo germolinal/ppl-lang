@@ -5,17 +5,14 @@ use crate::value_trait::ValueTrait;
 use crate::nil::Nil;
 use crate::number::Number;
 use crate::boolean::Boolean;
-//use crate::script_fn::ScriptFn;
-//use crate::array::Array;
-//use crate::object::Object;
-//use crate::string::StringV;
+
 
 #[derive(Copy,Clone)]
 pub enum Value {
     
     /// This represents an empty variable
     /// and should throw an error when it is 
-    /// used (e.g., 3 * nil).
+    /// used (e.g., 3 * nil ==> Error).
     Nil,
 
     /// A number, fully allocated in the stack
@@ -26,6 +23,12 @@ pub enum Value {
         
     /// A reference to an object allocated in the heap
     HeapRef(usize),    
+
+    /// A reference to an object allocated in the 
+    /// package elements vector
+    PackageRef(usize), 
+
+    
         
 }
 
@@ -77,12 +80,7 @@ impl Value {
     */
 
     
-    pub fn get_generic(&self)->Option<&Box<dyn ValueTrait>>{
-        match self {
-            //Value::Generic(v)=>Some(v),                            
-            _ => None
-        }
-    }
+    
     
 
     pub fn is_nil(&self)-> bool {
@@ -131,6 +129,7 @@ impl ValueTrait for Value  {
             Value::Number(v)=>v.type_name(),
             Value::Bool(v)=>v.type_name(),
             Value::HeapRef(_)=>format!("HeapReference"),
+            Value::PackageRef(_)=>format!("PackageReference"),
             
             
         })
@@ -142,6 +141,7 @@ impl ValueTrait for Value  {
             Value::Number(v) => ValueTrait::to_string(v),
             Value::Bool(v) => ValueTrait::to_string(v),
             Value::HeapRef(i)=>format!("HeapRef<{}>", i),                                  
+            Value::PackageRef(i)=>format!("PackageRef<{}>", i),                                  
         }
     }
 
@@ -153,6 +153,9 @@ impl ValueTrait for Value  {
             Value::Bool(v)=>ValueTrait::clone_to_value(v),            
             Value::HeapRef(i)=>{
                 Value::HeapRef(*i)
+            },       
+            Value::PackageRef(i)=>{
+                Value::PackageRef(*i)
             },                                  
         }
     }
@@ -169,7 +172,8 @@ impl ValueTrait for Value  {
             Value::Nil=>Nil.not(),
             Value::Number(v)=>v.not(),
             Value::Bool(v)=>v.not(),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -178,7 +182,8 @@ impl ValueTrait for Value  {
             Value::Nil=>Nil.negate(),
             Value::Number(v)=>v.negate(),
             Value::Bool(v)=>v.negate(),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -187,7 +192,8 @@ impl ValueTrait for Value  {
             Value::Nil=>Nil.add(other),
             Value::Number(v)=>v.add(other),
             Value::Bool(v)=>v.add(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -196,7 +202,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().subtract(other),
             Value::Number(v) => v.subtract(other),
             Value::Bool(v) => v.subtract(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),                        
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -205,7 +212,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().multiply(other),
             Value::Number(v) => v.multiply(other),
             Value::Bool(v) => v.multiply(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
             
         }
     }
@@ -215,7 +223,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().divide(other),
             Value::Number(v) => v.divide(other),
             Value::Bool(v) => v.divide(other),            
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),                        
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -224,7 +233,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().compare_equal(other),
             Value::Number(v) => v.compare_equal(other),
             Value::Bool(v) => v.compare_equal(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -233,7 +243,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().compare_not_equal(other),
             Value::Number(v) => v.compare_not_equal(other),
             Value::Bool(v) => v.compare_not_equal(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),                        
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -242,7 +253,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().greater(other),
             Value::Number(v) => v.greater(other),
             Value::Bool(v) => v.greater(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),                        
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -251,7 +263,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().less(other),
             Value::Number(v) => v.less(other),
             Value::Bool(v) => v.less(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),                        
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }
     }
 
@@ -260,7 +273,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().greater_equal(other),
             Value::Number(v) => v.greater_equal(other),
             Value::Bool(v) => v.greater_equal(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),                        
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }        
     }
 
@@ -269,7 +283,8 @@ impl ValueTrait for Value  {
             Value::Nil => Nil::new().less_equal(other),
             Value::Number(v) => v.less_equal(other),
             Value::Bool(v) => v.less_equal(other),
-            Value::HeapRef(_)=>panic!("Trying to opeate over a reference"),            
+            Value::HeapRef(_)=>panic!("Trying to opeate over a Heap reference"),            
+            Value::PackageRef(_)=>panic!("Trying to opeate over a Package reference"),            
         }              
     }
 }

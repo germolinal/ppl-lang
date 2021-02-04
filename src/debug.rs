@@ -119,6 +119,9 @@ pub mod debug {
             Operation::GetGlobal(i)=>{
                 return println!("OP_GET_LOCAL | {}",i);
             },
+            Operation::GetFromPackage(i)=>{
+                return println!("OP_GET_FROM_PACKAGE | {}",i);
+            },
             Operation::Pop(n)=>{
                 return println!("OP_POP | {}",n);
             },
@@ -218,6 +221,7 @@ pub mod debug {
             TokenType::TokenString => "STRING",
             TokenType::Number => "NUMBER",
             TokenType::Identifier => "IDENTIFIER",
+            TokenType::Package => "PACKAGE",
 
             // Keywords
             TokenType::And => "AND",

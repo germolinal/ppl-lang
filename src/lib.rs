@@ -7,9 +7,9 @@ mod nil;
 mod number;
 mod boolean;
 
-mod function;
 mod native_fn;
 mod script_fn;
+pub mod function;
 
 mod operations;
 mod chunk;
@@ -20,6 +20,8 @@ mod parse_function;
 
 mod parser;
 //mod handler;
+
+pub mod io;
 
 pub mod package;
 pub mod heap_list;

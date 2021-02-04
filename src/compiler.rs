@@ -26,13 +26,13 @@ pub struct Compiler<'a> {
 }
 
 
-pub fn compile<'a>(source: &'a Vec<u8>, heap: &mut HeapList, packages: &mut Packages) -> Option<Function> {            
+pub fn compile<'a>(source: &'a Vec<u8>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>) -> Option<Function> {            
     let compiler_options : Options<CompilerOptions> = vec![];
 
     let mut compiler = Compiler::new(compiler_options);
     let mut parser = Parser::new(source);
 
-    return parser.program(&mut compiler, heap, packages);
+    return parser.program(&mut compiler, heap, packages_dictionary, packages_elements);
 
 }
 
@@ -75,18 +75,16 @@ impl <'a>Compiler<'a> {
     /// If we move out of scope (i.e., the depth of the locals is 
     /// different from the current one in the compiler), it stops
     /// iterating and returns false.
-    pub fn var_is_in_scope(&self, var: &Token, source: &Vec<u8>)->bool {
+    pub fn var_is_in_scope(&self, var: &Token)->bool {
             
-        let var_slice = var.source_slice(source);
+        let var_slice = var.source_slice();
 
-        if self.locals.len() == 0 {
-            println!("No locals!");
+        if self.locals.len() == 0 {            
             return false;
         }
 
         for i in (0..self.locals.len()).rev() {
-            let local = &self.locals[i];
-            println!("Checking local {}", i);
+            let local = &self.locals[i];            
 
             // if the variables are out of scope, break, and declare it is not there
             //if local.depth < self.scope_depth {
@@ -95,10 +93,8 @@ impl <'a>Compiler<'a> {
             //}
 
             // if not the same length, don't bother
-            if local.name.length == var.length {
-                println!("local.name.length == var.length");
-                if var_slice == local.name.source_slice(source){
-                    println!("var_slice == local.name.source_slice(source)");
+            if local.name.length == var.length {                
+                if var_slice == local.name.source_slice(){                    
                     return true
                 }
             }
@@ -108,9 +104,9 @@ impl <'a>Compiler<'a> {
     }
 
     /// Retrieves the position of a local variable in the scope    
-    pub fn get_local(&self, var: &Token, source: &Vec<u8>) -> Option<usize> {
+    pub fn get_local(&self, var: &Token) -> Option<usize> {
             
-        let var_slice = var.source_slice(source);
+        let var_slice = var.source_slice();
 
         if self.locals.len() == 0 {
             return None;
@@ -121,7 +117,7 @@ impl <'a>Compiler<'a> {
                                     
             // if not the same length, don't bother
             if local.name.length == var.length {
-                if var_slice == local.name.source_slice(source){
+                if var_slice == local.name.source_slice(){
                     return Some(i)
                 }
             }
@@ -204,7 +200,7 @@ mod tests {
 
         assert_eq!(compiler.locals.len(),0);
 
-        assert!(!compiler.var_is_in_scope(&token, &src));
+        assert!(!compiler.var_is_in_scope(&token));
         compiler.add_local(token);
 
         assert_eq!(compiler.locals.len(),1);
@@ -212,7 +208,7 @@ mod tests {
         assert_eq!(compiler.locals[0].name.source_text(), "He");
         assert!(!compiler.locals[0].initialized);
 
-        assert!(compiler.var_is_in_scope(&token, &src));
+        assert!(compiler.var_is_in_scope(&token));
     }
 
     #[test]
@@ -247,8 +243,8 @@ mod tests {
 
         assert_eq!(compiler.locals.len(),0);
 
-        assert!(!compiler.var_is_in_scope(&token, &src));
-        assert!(!compiler.var_is_in_scope(&token2, &src));
+        assert!(!compiler.var_is_in_scope(&token));
+        assert!(!compiler.var_is_in_scope(&token2));
         
         compiler.add_local(token);
         compiler.add_local(token2);
@@ -263,9 +259,9 @@ mod tests {
         assert_eq!(compiler.locals[1].name.source_text(), "ll");
         assert!(!compiler.locals[1].initialized);
 
-        assert_eq!(compiler.get_local(&token, &src).unwrap(),0);
-        assert_eq!(compiler.get_local(&token2, &src).unwrap(),1);
-        assert!(compiler.get_local(&not_added, &src).is_none());
+        assert_eq!(compiler.get_local(&token).unwrap(),0);
+        assert_eq!(compiler.get_local(&token2).unwrap(),1);
+        assert!(compiler.get_local(&not_added).is_none());
 
     }
 }

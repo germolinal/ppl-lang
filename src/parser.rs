@@ -29,7 +29,7 @@ pub enum Precedence{
 }
 
 
-type ParseFn<'a> = fn(can_assign: bool, &mut Parser<'a>, &mut Compiler<'a>, heap: &mut HeapList);
+type ParseFn<'a> = fn(can_assign: bool, &mut Parser<'a>, &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>);
 
 pub struct ParseRule<'a> {
     pub prefix: Option<ParseFn<'a>>,
@@ -170,11 +170,7 @@ impl <'a>Parser<'a>{
             None => self.error_no_current_function()                
         }        
     }
-    
-
-    pub fn source(&self)->&Vec<u8>{
-        self.scanner.source()
-    }
+        
 
         
     pub fn get_rule(&self, ttype: TokenType)->ParseRule<'a>{
@@ -231,6 +227,15 @@ impl <'a>Parser<'a>{
                     precedence: Precedence::None,
                     next_precedence: Some(Precedence::Assignment),
                 }
+            },           
+            TokenType::Package =>{                
+                ParseRule{
+                    prefix: Some(package_element),
+                    infix: None,
+                    precedence: Precedence::None,
+                    next_precedence: Some(Precedence::Assignment),
+                }
+                
             },                        
             TokenType::TokenString => {
                 ParseRule{
@@ -374,7 +379,7 @@ impl <'a>Parser<'a>{
         }
     }
 
-    pub fn parse_precedence(&mut self, compiler: &mut Compiler<'a>, precedence: Precedence, heap: &mut HeapList){          
+    pub fn parse_precedence(&mut self, compiler: &mut Compiler<'a>, precedence: Precedence, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){          
         self.advance();
         let rule = match self.get_rule(self.previous.token_type()).prefix {
             Some(r) => r,
@@ -387,12 +392,12 @@ impl <'a>Parser<'a>{
         let can_assign : bool = precedence <= Precedence::Assignment;
 
         // Run the rule
-        rule(can_assign, self, compiler, heap);
+        rule(can_assign, self, compiler, heap, packages_dictionary, packages_elements);
 
         while precedence <= self.get_rule(self.current.token_type()).precedence {
             self.advance();
             match self.get_rule(self.previous.token_type()).infix{
-                Some(r)=>r(can_assign, self, compiler, heap),
+                Some(r)=>r(can_assign, self, compiler, heap, packages_dictionary, packages_elements),
                 None => self.internal_error_at_current(format!("No infix rule!"))
             }
         }                
@@ -403,13 +408,13 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// program -> declaration* EOF
-    pub fn program(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, _packages: &mut Packages) -> Option<Function> {            
+    pub fn program(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>) -> Option<Function> {            
         // Prime the pump
         self.advance();
         //self.advance();
 
         while !self.match_token(TokenType::EOF) && !self.had_error{
-            self.declaration(compiler, heap);
+            self.declaration(compiler, heap, packages_dictionary, packages_elements);
         }
                 
 
@@ -436,8 +441,7 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// declaration -> classDecl | funDecl | varDecl | statement
-    fn declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){    
-        self.show_tokens("declaration() - start");
+    fn declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
         match self.current.token_type(){
             TokenType::Class => {
                 self.advance();
@@ -445,15 +449,15 @@ impl <'a>Parser<'a>{
             },
             TokenType::Function => {
                 self.advance();                
-                self.fn_declaration(compiler, heap);
+                self.fn_declaration(compiler, heap, packages_dictionary, packages_elements);
             },
             TokenType::Let => {
                 self.advance();
                 let mut n : usize= 0;
-                self.var_declaration(compiler, heap, true, &mut n);
+                self.var_declaration(compiler, heap, true, &mut n, packages_dictionary, packages_elements);
             },
             _ => {                                
-                self.statement(compiler, heap);
+                self.statement(compiler, heap, packages_dictionary, packages_elements);
             }
         }
     }
@@ -463,7 +467,7 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar
     /// function -> fn IDENTIFIER (varlist) BLOCK
-    fn fn_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+    fn fn_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
         
         // fn has been consumed.
         if self.consume(TokenType::Identifier){
@@ -473,7 +477,7 @@ impl <'a>Parser<'a>{
             
             let func_name = self.previous;
 
-            let func  = match function(self, func_name.txt, compiler, heap){
+            let func  = match function(self, func_name.txt, compiler, heap, packages_dictionary, packages_elements){
                 Some(f)=>f,
                 None => return
             };
@@ -500,7 +504,7 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// var_declaration -> "let" IDENTIFIER ("=" expression)
-    pub fn var_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, define: bool, n_declared_vars : &mut usize){        
+    pub fn var_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, define: bool, n_declared_vars : &mut usize, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){        
         
         // Get the token representing the name
         if !self.consume(TokenType::Identifier){
@@ -513,12 +517,9 @@ impl <'a>Parser<'a>{
 
         if define {
             // Define 
-            if self.match_token(TokenType::Equal){ 
-                if self.check(TokenType::Function){
-                    panic!("Please define functions as fn ID(){}")
-                }                                               
+            if self.match_token(TokenType::Equal){                                                               
                 // Put value of expression on the stack                        
-                self.expression(compiler, heap);                             
+                self.expression(compiler, heap, packages_dictionary, packages_elements);                             
             }else{
                 // Or NIL.
                 self.emit_byte(Operation::PushNil);            
@@ -534,7 +535,7 @@ impl <'a>Parser<'a>{
         
         // Check if there is another variable afterwards
         if self.consume(TokenType::Comma) {
-            self.var_declaration(compiler, heap, define, n_declared_vars);
+            self.var_declaration(compiler, heap, define, n_declared_vars, packages_dictionary, packages_elements);
         }    
         
     }
@@ -548,7 +549,7 @@ impl <'a>Parser<'a>{
     fn declare_variable(&mut self, compiler: &mut Compiler<'a>){
         let var_name = self.previous();
                     
-        if compiler.var_is_in_scope(var_name, self.source()){
+        if compiler.var_is_in_scope(var_name){
             //self.error_at_current(format!("A variable called '{}' already exists in this scope", var_name.source_text(self.source())));
             panic!("A variable called '{}' already exists in this scope", var_name.source_text());
             //return;
@@ -562,14 +563,14 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// while_statement -> while EXPRESSION BLOCK
-    fn while_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+    fn while_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
         let while_start = match self.chunk_len(){
             Some(i)=>i,
             None => return
         };
 
         // Compile expression (puts a boolean on the stack)
-        self.expression(compiler, heap);
+        self.expression(compiler, heap, packages_dictionary, packages_elements);
         
         // This is patched later in this function
         self.emit_byte(Operation::JumpIfFalse(0)); 
@@ -587,7 +588,7 @@ impl <'a>Parser<'a>{
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
-        self.block(compiler, heap);        
+        self.block(compiler, heap, packages_dictionary, packages_elements);        
         self.end_scope(compiler);
 
         // Mark the end
@@ -608,10 +609,10 @@ impl <'a>Parser<'a>{
     /// Compiles an If statement
     /// # EBNF Grammar:
     /// if_statement -> if EXPRESSION BLOCK
-    fn if_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+    fn if_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
         
         // Compile expression (puts a boolean on the stack)
-        self.expression(compiler, heap);
+        self.expression(compiler, heap, packages_dictionary, packages_elements);
 
         // This is patched later in this function        
         self.emit_byte(Operation::JumpIfFalse(0)); 
@@ -629,7 +630,7 @@ impl <'a>Parser<'a>{
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
-        self.block(compiler, heap);        
+        self.block(compiler, heap, packages_dictionary, packages_elements);        
         self.end_scope(compiler);
 
         // Mark the end
@@ -651,7 +652,7 @@ impl <'a>Parser<'a>{
                 Some(i)=>i,
                 None => return
             };
-            self.statement(compiler, heap);
+            self.statement(compiler, heap, packages_dictionary, packages_elements);
 
             // Mark the end
             let body_end = match self.chunk_len(){
@@ -671,29 +672,25 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// for_statement -> for IDENTIFIER in EXPRESSION  BLOCK
-    fn for_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+    fn for_statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
                 
         // Open the main scope for this for statement.
         self.begin_scope(compiler);
 
         // consume declare the variables
-        self.show_tokens("for_statement - Before VAR Declaration");
         let mut n_declared_vars : usize = 0;
-        self.var_declaration(compiler, heap, true, &mut n_declared_vars);        
-        self.show_tokens("for_statement - AFTER VAR Declaration");
-        println!(" ----> Declared {}",n_declared_vars);
+        self.var_declaration(compiler, heap, true, &mut n_declared_vars, packages_dictionary, packages_elements);                
         
         // consume 'in', or fail
         if !self.consume(TokenType::In) {
             return self.error_at_current(format!("Expecting keyword 'in' when declaring For loop."));
         }
-        self.show_tokens("for_statement - Before Expression()");
+        
         
         // Evaluate the value to iterate over... put it at the end 
         // of the stack.
-        self.expression(compiler, heap);
-        self.show_tokens("for_statement - AFTER Expression()");
-
+        self.expression(compiler, heap, packages_dictionary, packages_elements);
+        
         
         /* PROCESS BODY */
         // Mark the beginning of body (for looping)
@@ -708,7 +705,7 @@ impl <'a>Parser<'a>{
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
-        self.block(compiler, heap);        
+        self.block(compiler, heap, packages_dictionary, packages_elements);        
         self.end_scope(compiler);
 
         // Mark the end of the scope
@@ -731,42 +728,39 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// statement -> expression | forStmt | ifStmt | returnStmt | whileStmt| block ;
-    fn statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){  
+    fn statement(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
                 
         match self.current.token_type(){
             TokenType::LeftBrace => {
-                self.show_tokens("statement - LeftBrace before advance()");
                 self.advance();
-                self.show_tokens("statement - LeftBrace after advance()");
                 self.begin_scope(compiler);
-                self.block(compiler, heap);
-                self.show_tokens("statement - after block()");
+                self.block(compiler, heap, packages_dictionary, packages_elements);
                 self.end_scope(compiler);
             },
             TokenType::For => {
                 self.advance();
-                self.for_statement(compiler, heap);
+                self.for_statement(compiler, heap, packages_dictionary, packages_elements);
             },
             TokenType::If =>{
                 self.advance();
-                self.if_statement(compiler, heap);
+                self.if_statement(compiler, heap, packages_dictionary, packages_elements);
             },
             TokenType::Return =>{
                 // only one value can be returned
                 self.advance();
-                self.expression(compiler, heap);
+                self.expression(compiler, heap, packages_dictionary, packages_elements);
                 self.emit_byte(Operation::Return)
             },
             TokenType::While =>{
                 self.advance();
-                self.while_statement(compiler, heap);
+                self.while_statement(compiler, heap, packages_dictionary, packages_elements);
             },
             TokenType::EOF=>{
                 return
             },
             _ => {
                 // Expression-statement
-                self.expression(compiler, heap);
+                self.expression(compiler, heap, packages_dictionary, packages_elements);
                 self.emit_byte(Operation::Pop(1));
             }
         }
@@ -776,8 +770,8 @@ impl <'a>Parser<'a>{
     /// Compiles an expression
     /// # EBFN Grammar:
     /// expression -> literal | unary | binary | grouping;
-    pub fn expression(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){                    
-        self.parse_precedence(compiler, Precedence::Assignment, heap);
+    pub fn expression(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){                    
+        self.parse_precedence(compiler, Precedence::Assignment, heap, packages_dictionary, packages_elements);
     }
 
 
@@ -806,22 +800,16 @@ impl <'a>Parser<'a>{
     /// 
     /// # EBNF Grammar:
     /// block -> "{" declaration* "}"
-    pub fn block(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList){ 
+    pub fn block(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){ 
         // LEFT BRACE HAS BEEN CONSUMED ALREADY
-        println!("====== <<<< BEGIN");
-        
-
-        self.show_tokens("block - before loop");       
         while !self.check(TokenType::RightBrace) && !self.check(TokenType::EOF){
-            self.declaration(compiler, heap);
+            self.declaration(compiler, heap, packages_dictionary, packages_elements);
         }
-        self.show_tokens("block - after loop");
+        
         if !self.consume(TokenType::RightBrace){
             return self.error_at_current(format!("Expecting '}}' after block."));            
         }
-
-        self.show_tokens("block end (if not error)");
-        println!("====== <<<< END");
+        
     }
 
     /// Marks a variable in the compiler as initialized
@@ -970,7 +958,9 @@ mod tests {
         let source : Vec<u8> = raw_source.into_bytes();
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
+
         parser.advance();
         parser.advance();
 
@@ -981,7 +971,7 @@ mod tests {
         
         let mut heap = HeapList::new();
         
-        number(false, &mut parser, &mut compiler, &mut heap);        
+        number(false, &mut parser, &mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements);        
         if let (Operation::PushNumber(found), _) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.0,*found);            
         }else{
@@ -1001,8 +991,8 @@ mod tests {
             _ => {panic!("Expecting Number, found {}", debug::token(parser.previous))}
         }
         
-        number(false, &mut parser,&mut compiler, &mut heap);
-        number(false, &mut parser,&mut compiler, &mut heap);        
+        number(false, &mut parser,&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements);
+        number(false, &mut parser,&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements);        
         if let (Operation::PushNumber(found),_) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.1,*found);            
         }else{
@@ -1023,9 +1013,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk, format!("test_expression chunck"));
@@ -1033,7 +1024,7 @@ mod tests {
             let mut vm = VM::new();   
 
             vm.push_call_frame(CallFrame::new(0,f.clone_rc()));
-            vm.run(&mut heap);            
+            vm.run(&mut heap, &packages_elements);            
 
             
             
@@ -1061,9 +1052,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             
             let chunk = f.chunk().unwrap();
             
@@ -1110,7 +1102,8 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        //let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
         // prime the pump (done in self.program())
         parser.advance();
@@ -1122,7 +1115,7 @@ mod tests {
         parser.advance();
         
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);        
 
         // Check that the next one is let
@@ -1139,7 +1132,7 @@ mod tests {
         parser.advance();
         
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);
 
         // Check that the next one is let
@@ -1163,9 +1156,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){                          
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){                          
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk,"the_chunk".to_string());
                         
@@ -1216,17 +1210,18 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
         parser.advance();parser.advance();
         let mut n : usize = 0;
-        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,3);
 
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             let chunk = f.chunk().unwrap();
 
             debug::chunk( chunk ,"the_chunk".to_string());
@@ -1274,9 +1269,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        parser.program(&mut compiler, &mut heap, &mut packages);
+        parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements);
 
         let x = Token{
             line: 1,
@@ -1287,7 +1283,7 @@ mod tests {
         };
         assert_eq!(x.source_text(), format!("x"));
 
-        assert!(compiler.var_is_in_scope(&x, &source));
+        assert!(compiler.var_is_in_scope(&x));
 
         let y = Token{
             line: 1,
@@ -1297,7 +1293,7 @@ mod tests {
             token_type: TokenType::Identifier
         };
         assert_eq!(y.source_text(), format!("y"));
-        assert!(!compiler.var_is_in_scope(&y, &source));
+        assert!(!compiler.var_is_in_scope(&y));
     }
     
 
@@ -1309,9 +1305,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        parser.program(&mut compiler, &mut heap, &mut packages);
+        parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements);
         assert!(!parser.had_error);
 
         // Now do it more slowly
@@ -1320,7 +1317,8 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        //let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
         parser.advance();
 
@@ -1330,7 +1328,7 @@ mod tests {
         // Check if there is a let, and consume it.
         assert!(parser.match_token(TokenType::Let));        
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);
 
         // Check that the next one is {, and consume it
@@ -1338,12 +1336,12 @@ mod tests {
                 
 
         /* CONSUME BLOCK */
-        parser.block(&mut compiler, &mut heap);
+        parser.block(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements);
 
         // declare Z (check that there is a LET, and consume it first)
         assert!(parser.match_token(TokenType::Let));       
         let mut n : usize= 0;
-        parser.var_declaration(&mut compiler, &mut heap, true, &mut n);
+        parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);
     }
 
@@ -1357,9 +1355,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
 
             let chunk = f.chunk().unwrap();
 
@@ -1398,9 +1397,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
         
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             // Check the operations...
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk, raw_source);
@@ -1443,9 +1443,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             // Check the operations...
             let chunk = f.chunk().unwrap();
             debug::chunk(chunk, raw_source);
@@ -1541,9 +1542,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);   
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(_) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(_) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
         }else{
             assert!(false);
         }
@@ -1551,20 +1553,22 @@ mod tests {
 
     #[test]
     fn test_function_declaration_no_params(){
-        let raw_source = "let x = fn() { \nlet i = 123 \nreturn i }".to_string();
+        let raw_source = "fn x() { \nlet i = 123 \nreturn i }".to_string();
         let source : Vec<u8> = raw_source.into_bytes();
 
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);  
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(_) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(_) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
         }else{
             assert!(false);
         }
     }
 
+    
     #[test]
     fn test_function_expression(){
         let raw_source = "let x = fn(a) { let i = fn(){} return i }".to_string();
@@ -1573,9 +1577,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);  
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(main) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(main) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             assert!(!parser.had_error);
 
             let chunk = main.chunk().unwrap();
@@ -1629,9 +1634,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source); 
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             assert!(!parser.had_error);
             let chunk = f.chunk().unwrap();
 
@@ -1647,7 +1653,7 @@ mod tests {
             assert_eq!(compiler.local_count(),1);
             println!("locals[0] -> '{}'", compiler.locals[0].name.source_text());
             assert_eq!(x_token.source_text(),format!("x"));
-            assert!(compiler.var_is_in_scope(&x_token, &source));
+            assert!(compiler.var_is_in_scope(&x_token));
 
             let x = heap.get(0).unwrap()            
                     .as_any()
@@ -1678,9 +1684,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             assert!(!parser.had_error);
             let chunk = f.chunk().unwrap();
 
@@ -1696,9 +1703,10 @@ mod tests {
         let mut compiler = Compiler::new(vec![]);
         let mut parser = Parser::new(&source);  
         let mut heap = HeapList::new();
-        let mut packages : Packages = HashMap::new();
+        let mut packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let mut packages_dictionary : Packages = HashMap::new();
 
-        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages){
+        if let Some(f) = parser.program(&mut compiler, &mut heap, &mut packages_dictionary, &mut packages_elements){
             assert!(!parser.had_error);
             let chunk = f.chunk().unwrap();
             

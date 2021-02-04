@@ -4,6 +4,7 @@ use crate::token::*;
 use crate::operations::*;
 use crate::function::Function;
 use crate::compiler::Compiler;
+use crate::package::Packages;
 
 /* PARSING FUNCTIONS */
 
@@ -11,13 +12,13 @@ use crate::compiler::Compiler;
 /// Processes a unitary operation.
 /// 
 /// Does not use the 'can_assign'
-pub fn unary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+pub fn unary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
         
     // Get the unary Token
     let token_type = parser.previous().token_type();
 
     // Consume the expresion after
-    parser.parse_precedence(compiler, Precedence::Unary, heap);
+    parser.parse_precedence(compiler, Precedence::Unary, heap, packages_dictionary, packages_elements);
 
     // Emit the operation
     match token_type{
@@ -33,7 +34,7 @@ pub fn unary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Comp
     };
 }
 
-pub fn string<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
+pub fn string<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     /*
     let v = parser.previous().source_text();                
     parser.emit_byte(Operation::PushString(Box::new(v)));
@@ -41,7 +42,7 @@ pub fn string<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _h
     unimplemented!();
 }
 
-pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
+pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     unimplemented!();
     /*
     //parser.advance();
@@ -66,7 +67,7 @@ pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _he
 }
 
 /// Parses a number... does not use the 'can_assign'
-pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
+pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     let v = parser.previous().source_text();            
     let the_v = match v.parse::<f64>(){
         Ok(v)=>v,
@@ -79,7 +80,7 @@ pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: 
 
 
 /// Parses an indexation (i.e. x[i]) operation
-pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
+pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     unimplemented!();
 }
 
@@ -87,14 +88,14 @@ pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: 
 /// pushes arguments separated by commas
 /// e.g. arg1, arg2, arg3,...
 /// 
-fn arg_list<'a>(parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, n: &mut usize){
+fn arg_list<'a>(parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, n: &mut usize, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     
    
     // Left Paren has been consumed
     loop {
                 
         // Evaluate an expression
-        parser.expression(compiler, heap);
+        parser.expression(compiler, heap, packages_dictionary, packages_elements);
         // Increase count
         *n+=1;
 
@@ -111,7 +112,7 @@ fn arg_list<'a>(parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut
 /// Parses a call...
 ///
 /// Does not use the 'can_assign'
-pub fn call<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+pub fn call<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     
     
     // Push arguments
@@ -119,7 +120,7 @@ pub fn call<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compil
 
     // If not empty arglist
     if !parser.check(TokenType::RightParen){
-        arg_list(parser, compiler, heap, &mut n_args);    
+        arg_list(parser, compiler, heap, &mut n_args, packages_dictionary, packages_elements);    
     }
     if !parser.consume(TokenType::RightParen){
         parser.error_at_current(format!("Expected ')' after argument list in function call"));
@@ -133,9 +134,9 @@ pub fn call<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compil
 /// Parses grouping (e.g., '(x*y/z)' )
 /// 
 /// Does not use the 'can_assign'
-pub fn grouping<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+pub fn grouping<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     // left paren has been consumed
-    parser.expression(compiler, heap);
+    parser.expression(compiler, heap, packages_dictionary, packages_elements);
     if !parser.consume(TokenType::RightParen) {
         parser.error_at_current(format!("Expected ')' after expression"));
     }
@@ -144,14 +145,14 @@ pub fn grouping<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut C
 /// Parses binary operation.
 /// 
 /// Does not use the 'can_assign'
-pub fn binary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+pub fn binary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     // Get the Binary
     let operator_type = parser.previous().token_type();
 
     // Compile what is after
     let rule = parser.get_rule(operator_type);
     match rule.next_precedence{
-        Some(precedence)=>parser.parse_precedence(compiler, precedence, heap),
+        Some(precedence)=>parser.parse_precedence(compiler, precedence, heap, packages_dictionary, packages_elements),
         None => parser.internal_error_at_current(format!("No next precedence found for binary operation"))
     }
 
@@ -201,7 +202,7 @@ pub fn binary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Com
 /// Parses literals. 
 /// 
 /// Does not use the 'can_assign'
-pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList){
+pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     match parser.previous().token_type(){
         TokenType::False => parser.emit_byte(Operation::PushBool(false)),
         TokenType::True => parser.emit_byte(Operation::PushBool(true)),        
@@ -210,12 +211,11 @@ pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap:
 }
 
 /// Parses an anonymous function                    
-pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<'a>, heap: &mut HeapList)->Option<Function>{
+pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>)->Option<Function>{
         
     // starts from the (), so it covers
     // both 'let x = fn(){}' and 'fn ID(){}'
-    // this becomes { let args[]; ...body...  }
-    parser.show_tokens("function()");
+    // this becomes { let args[]; ...body...  }    
     if !parser.consume(TokenType::LeftParen){
         parser.error_at_current(format!("Expecting '(' when defining function"));        
         return None;
@@ -243,10 +243,10 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
     parser.begin_scope(&mut clean_compiler);
 
     let mut n_vars : usize = 0;
-    parser.show_tokens("before var_declaration()");
+    
     match parser.current().token_type(){
         // There are variables... declare them (but DO NOT define them)
-        TokenType::Identifier => parser.var_declaration(&mut clean_compiler, heap, false, &mut n_vars),
+        TokenType::Identifier => parser.var_declaration(&mut clean_compiler, heap, false, &mut n_vars, packages_dictionary, packages_elements),
         // Nothing to declare
         TokenType::RightParen => {},
         _ => {
@@ -268,13 +268,12 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
     }
 
     // Open, process, and close body    
-    parser.block(&mut clean_compiler, heap);
+    parser.block(&mut clean_compiler, heap, packages_dictionary, packages_elements);
     
     // No end_scope()... this is done 
     // when processing the Return operation
     // parser.end_scope(&mut compiler);
-
-    parser.show_tokens("function()  2");
+    
 
     // Get the created function back.
     let mut new_func = match parser.take_current_function(){
@@ -313,9 +312,9 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
 /// Anonymous function parser
 /// 
 /// Does not use the 'can_assign'
-pub fn function_value<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+pub fn function_value<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     
-    if let Some(f) = function(parser, "<Anonymous Function>".as_bytes(), compiler, heap){        
+    if let Some(f) = function(parser, "<Anonymous Function>".as_bytes(), compiler, heap, packages_dictionary, packages_elements){        
         // f is now the function.
         let v = Box::new(f);
         let i = heap.push(v);      
@@ -324,17 +323,44 @@ pub fn function_value<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &
     }
 }
 
+pub fn package_element<'a>(can_assign: bool, parser: &mut Parser<'a>, _compiler: &mut Compiler<'a>, _heap: &mut HeapList, packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
+    let pkg_name = parser.previous().source_text().to_string();
+    
+    let pkg = match packages_dictionary.get(&pkg_name){
+        Some(p)=>p,
+        None => {panic!("Package '{}' not found", pkg_name)}
+    };
+
+    // consume package name
+    parser.advance();
+
+    let fn_name = parser.previous().source_text().to_string();
+
+    let function_index = match pkg.get(&fn_name){
+        Some(f)=>f,
+        None => {panic!("Function '{}' not found in Package '{}", fn_name, pkg_name )}
+    };
+
+    if can_assign && parser.match_token(TokenType::Equal){
+        panic!("Trying to reassign a Package function... Packages are inmutable");
+    }else{
+        parser.emit_byte(Operation::GetFromPackage(*function_index));
+    }
 
 
-pub fn variable<'a>(can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList){
+
+
+}
+
+pub fn variable<'a>(can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     // search back for a variable with the same name
     //let var_name = parser.previous();
         
-    match compiler.get_local(parser.previous(), parser.source()){
+    match compiler.get_local(parser.previous()){
         Some(i)=>{
 
             if can_assign && parser.match_token(TokenType::Equal){
-                parser.expression(compiler, heap);
+                parser.expression(compiler, heap, packages_dictionary, packages_elements);
                 parser.emit_byte(Operation::SetLocal(i))
             }else{
                 parser.emit_byte(Operation::GetLocal(i));
@@ -349,7 +375,7 @@ pub fn variable<'a>(can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Co
                 match heap.get_global_function(parser.previous()){
                     Some(i)=> parser.emit_byte(Operation::GetGlobal(i)),
                     None => {
-                        panic!("Variable {} not found", parser.previous().source_text());
+                        panic!("Variable '{}' not found", parser.previous().source_text());
                     }
                 }
                 

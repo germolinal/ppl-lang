@@ -15,19 +15,28 @@ fn double(x){
     return 2*x
 }
 
+let double2 = fn(x){
+    return 2*x
+}
+
 let f = double
 
-fn f1(a, b){
 
-    fn x (){
-        return f(1)
+fn f1(a, b, func){
+
+    let  x = fn(){
+        return double(0.5)
     }
 
-    return f(a) + b + x()
+    return func(a) + b + x()
 }
 
 
-let y = f1(1111, 2222)
+let y = f1(1111, 2222, f)
+
+let t = io::print(y, 23, 24)
+
+io::print(t)
 
 
 //let x=1,y,z

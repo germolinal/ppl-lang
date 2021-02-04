@@ -28,7 +28,7 @@ pub enum Operation {
     GetLocal(usize),
     SetLocal(usize),
     GetGlobal(usize),
-    //SetGlobal(usize),
+    GetFromPackage(usize),
 
     Pop(usize),
     DefineVars(usize),

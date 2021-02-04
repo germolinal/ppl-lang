@@ -87,7 +87,7 @@ impl <'a>Scanner<'a> {
                 
     }
 
-    pub fn advance (&mut self )->Option<char>{
+    pub fn advance(&mut self )->Option<char>{
         let c = self.source.get(self.current_index);
 
         match c {
@@ -285,7 +285,7 @@ impl <'a>Scanner<'a> {
                             return self.make_token(TokenType::For);
                         }
                     },
-                    _ => return self.make_token(TokenType::Identifier)                        
+                    _ => {/*JUST GET OUT OF THIS MATCH*/}
                 }
             },
             'i' => {
@@ -302,7 +302,7 @@ impl <'a>Scanner<'a> {
                             return self.make_token(TokenType::In);
                         }
                     },
-                    _ => return self.make_token(TokenType::Identifier)                        
+                    _ => {/*JUST GET OUT OF THIS MATCH*/}
                 }
             },
             'l' => { // let
@@ -342,10 +342,18 @@ impl <'a>Scanner<'a> {
                     return self.make_token(TokenType::While);
                 }
             },
-            _ => return self.make_token(TokenType::Identifier)                        
+            _ => {/*JUST GET OUT OF THIS MATCH*/}
         }
-        // If not a keyword,
-        return self.make_token(TokenType::Identifier);                        
+        
+        // If not a keyword,        
+        if self.peek() == ':' && self.peek_next()==':'{
+            let ret = self.make_token(TokenType::Package);
+            self.advance();self.advance();            
+            return ret;                        
+        }else{
+
+            return self.make_token(TokenType::Identifier);                        
+        }
         
     }
     
@@ -385,7 +393,7 @@ impl <'a>Scanner<'a> {
         };
         
         // Alphabetic or underscore allowed
-        if c.is_ascii_alphabetic() || c == '_'{
+        if c.is_ascii_alphabetic() || c == '_'{            
             return self.identifier();
         }  
 
@@ -459,7 +467,7 @@ impl <'a>Scanner<'a> {
 
             // Error            
             _ => {
-                self.error_msg = format!("Unexpected character at line {} -- starts with character '{}' (char {} out of {}) {}",self.line,c, self.current_index(), self.source.len(), c as u8);
+                self.error_msg = format!("Unexpected character '{}' at line {} ",c, self.line);
                 self.make_token(TokenType::Error)
             }
         }        
@@ -1048,6 +1056,27 @@ mod tests {
     fn test_scan_identifier(){
 
     
+        // package::function
+        let raw_source = format!(" io::print");
+        let source : Vec<u8> = raw_source.into_bytes();
+        let mut scanner = Scanner::new(&source);
+
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Package => {                                
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token))},
+        };
+        let token = scanner.scan_token();
+        match token.token_type() {
+            TokenType::Identifier => {                                
+
+            },
+            _ =>{panic!("Incorrect token ==> {}",debug::token(token))},
+        };
+
+
 
         // and
         let raw_source = format!(" and more elements");

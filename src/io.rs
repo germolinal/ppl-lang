@@ -1,29 +1,30 @@
-// MINIMUM REQUIREMENTS
-use crate::package::Package;
-use crate::handler::Handler;
-use crate::vm::VM;
 
+use crate::function::Function;
+use crate::package::{Package, Packages};
+use crate::vm::VM;
 use crate::value_trait::ValueTrait;
 
-fn print(vm: &mut VM, nvars: usize)->usize{
-    
-    for _ in 0..nvars{
-        let v = vm.pop().unwrap();
-        print!("{} ",v.to_string());
+fn print(vm: &mut VM, n_args: usize)->usize{
+        
+    let args = vm.get_last_stack(n_args);    
+
+    for arg in args{        
+        print!("{} ",arg.to_string());
     }
     println!("");
 
     return 0;
 }
 
-pub fn register_io_package(handler: &mut Handler){
+pub fn register_io_package(packages: &mut Packages, elements : &mut Vec<Function>){
     
     // Create the packate
-    let mut pkg = Package::new(&"io".to_string());
+    let mut pkg = Package::new("io".to_string());
 
     // Add functions
-    pkg.register_rust_func("print",print).unwrap();
+    pkg.register_rust_func("print",print, elements).unwrap();
 
     // Register the package
-    handler.push_package(pkg);
+    packages.insert(pkg.name.clone(), pkg);
+    //handler.push_package(pkg);
 }

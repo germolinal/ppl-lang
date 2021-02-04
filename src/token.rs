@@ -23,6 +23,7 @@ pub enum TokenType{
     TokenString,
     Number,
     Identifier,
+    Package,
 
     // Keywords
     And,
@@ -103,13 +104,8 @@ impl <'a>Token<'a>{
         self.token_type
     }
 
-    pub fn source_slice(&self, source: &'a Vec<u8>)->&'a [u8]{
-        let ini = self.start;
-        let fin = self.length + ini;
-        match source.get(ini..fin){
-            Some(s)=>s,
-            None => panic!(format!("Could not get slice representing the text of a Token (ini={}, fin={})... out of bounds", ini, fin))
-        }
+    pub fn source_slice(&self)->&'a [u8]{
+        self.txt        
     }
 
     pub fn source_text(&self)->&str{
