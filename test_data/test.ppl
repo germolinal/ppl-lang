@@ -1,0 +1,26 @@
+
+
+let y = 5
+
+if y > 10 {
+    io::print(11)
+
+} else if y >= 5 {
+    io::print(6)
+
+} else if y > 3 {
+    io::print(4)
+
+} else {
+    io::print(2)
+}
+
+
+
+
+//let x=1,y,z
+//y = z = 3/2 * 2.5
+
+//let y = 2
+
+//return 1

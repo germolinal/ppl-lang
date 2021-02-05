@@ -642,7 +642,7 @@ impl <'a>Parser<'a>{
         // Patch jump
         let body_length = body_end - body_start;
         //self.chunk().patch_code(body_start-1 ,Operation::JumpIfFalse(body_length+1)); 
-        self.patch_chunk(body_start-1, Operation::JumpIfFalse(body_length+1)); 
+        self.patch_chunk(body_start-1, Operation::JumpIfFalse(body_length)); 
 
         // check else
         if self.consume(TokenType::Else){
@@ -652,7 +652,21 @@ impl <'a>Parser<'a>{
                 Some(i)=>i,
                 None => return
             };
-            self.statement(compiler, heap, packages_dictionary, packages_elements);
+
+            // check if "else if" case 
+            if self.consume(TokenType::If){
+                // Get rid of old                 
+                self.if_statement(compiler, heap, packages_dictionary, packages_elements);
+
+            } else if self.consume(TokenType::LeftBrace){
+                // Open, process, and close the scope for the body        
+                self.begin_scope(compiler);
+                self.block(compiler, heap, packages_dictionary, packages_elements);        
+                self.end_scope(compiler);
+                
+            } else{
+                return self.error_at_current(format!("Expecting 'if' or '{{' after 'else' keyword"));
+            }
 
             // Mark the end
             let body_end = match self.chunk_len(){
@@ -663,8 +677,13 @@ impl <'a>Parser<'a>{
             // Patch jump
             let body_length = body_end - body_start;
             //self.chunk().patch_code(body_start-1 ,Operation::JumpIfTrue(body_length+1)); 
-            self.patch_chunk(body_start-1, Operation::JumpIfTrue(body_length+1));
+            self.patch_chunk(body_start-1, Operation::JumpIfTrue(body_length));
+
+            
         }
+
+        // Pop the Expression that drove this flow
+        self.emit_byte(Operation::Pop(1));
 
     }
 

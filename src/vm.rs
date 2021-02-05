@@ -65,13 +65,14 @@ impl VM {
             let ip = self.call_frames[frame_n].ip();
 
             if ip >= self.call_frames[frame_n].n_operations().unwrap(){                
+                println!("OUT OF SCOPE!... ip = {}, len = {}", ip, self.call_frames[frame_n].n_operations().unwrap());
                 break;
             }   
 
             /*****************************/
             /* Dissassemble when developing */
             /*****************************/
-            
+            /*
             #[cfg(debug_assertions)]
             {
                 // report stack
@@ -87,6 +88,7 @@ impl VM {
                 debug::operation(code_lines, ip);                
             
             }
+            */
             
             /*****************************/
             /*****************************/
@@ -414,24 +416,24 @@ impl VM {
 
                 },// End of for_loop operation
                 Operation::JumpIfFalse(n)=>{                    
-
-                    let value = self.pop().unwrap();
-                    if let Value::Bool(v) = value {
-                        if !v {                            
+                
+                    if let Value::Bool(v) = self.stack.last().unwrap() {
+                        if !(*v) {                            
                             self.call_frames[frame_n].jump_forward(n);
                         }
                     }else{
-                        return InterpretResult::RuntimeError(format!("Expression in while loop ( while EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
+                        let value = self.pop().unwrap();
+                        return InterpretResult::RuntimeError(format!("Expression in 'if' statement (i.e., if EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
                     }
                 },
-                Operation::JumpIfTrue(n)=>{
-                    let value = self.pop().unwrap();
-                    if let Value::Bool(v) = value {
-                        if v {                            
+                Operation::JumpIfTrue(n)=>{                    
+                    if let Value::Bool(v) = self.stack.last().unwrap() {
+                        if *v {                            
                             self.call_frames[frame_n].jump_forward(n);
                         }
                     }else{
-                        return InterpretResult::RuntimeError(format!("Expression in while loop ( while EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
+                        let value = self.pop().unwrap();
+                        return InterpretResult::RuntimeError(format!("Expression in 'if' statement (i.e., if EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
                     }
                 },
                 Operation::JumpBack(n)=>{                    

@@ -20,28 +20,3 @@ let double2 = fn(x){
 }
 
 let f = double
-
-
-fn f1(a, b, func){
-
-    let  x = fn(){
-        return double(0.5)
-    }
-
-    return func(a) + b + x()
-}
-
-
-let y = f1(1111, 2222, f)
-
-let t = io::print(y, 23, 24)
-
-io::print(t)
-
-
-//let x=1,y,z
-//y = z = 3/2 * 2.5
-
-//let y = 2
-
-//return 1
