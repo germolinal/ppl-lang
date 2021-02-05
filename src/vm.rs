@@ -49,11 +49,10 @@ impl VM {
     
     /// Runs the last CallFrame in the call_stack
     pub fn run( &mut self, heap: &mut HeapList, packages_elements: &Vec<Function> ) -> InterpretResult {
-                
-        
+                        
         let mut frame_n = self.call_frames.len() - 1;
         
-        loop {  
+        loop {              
             // This variable allows some operation to stop
             // advancing through the code ONCE. It is used
             // when calling functions (because we need to start
@@ -64,8 +63,7 @@ impl VM {
             let first_call_frame_slot = self.call_frames[frame_n].first_slot();
             let ip = self.call_frames[frame_n].ip();
 
-            if ip >= self.call_frames[frame_n].n_operations().unwrap(){                
-                println!("OUT OF SCOPE!... ip = {}, len = {}", ip, self.call_frames[frame_n].n_operations().unwrap());
+            if ip >= self.call_frames[frame_n].n_operations().unwrap(){                                
                 break;
             }   
 
@@ -445,6 +443,7 @@ impl VM {
                     self.stack.push(Value::HeapRef(i))
                 },                 
                 Operation::Call(n_vars)=>{
+                                        
                     let f_ref = self.stack[ self.stack.len() - n_vars - 1 ];
 
                     match f_ref {

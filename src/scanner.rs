@@ -1,5 +1,4 @@
-#[cfg(test)]
-use crate::debug::*;
+
 
 use crate::token::*;
 
@@ -484,6 +483,7 @@ impl <'a>Scanner<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::debug::*;
 
     #[test]
     fn test_scanner_advance(){

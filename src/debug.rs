@@ -1,4 +1,4 @@
-#[cfg(debug_assertions)]
+
 pub mod debug {
     //use crate::chunk::Chunk;
     use crate::operations::*;
@@ -41,13 +41,7 @@ pub mod debug {
             
             Operation::Return => {
                 return println!("OP_RETURN");
-            },
-    
-            /*
-            Operation::Constant(c_index) => {
-                return constant_instruction(&"OP_CONSTANT", chunk, *c_index);
-            },
-            */
+            },            
     
             Operation::Negate => {
                 return simple_instruction("OP_NEGATE", offset);
