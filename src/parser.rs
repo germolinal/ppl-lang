@@ -469,13 +469,19 @@ impl <'a>Parser<'a>{
     /// function -> fn IDENTIFIER (varlist) BLOCK
     fn fn_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
         
+        self.declare_variable(compiler);
+
         // fn has been consumed.
         if self.consume(TokenType::Identifier){
-
-            // declare the variable.
-            self.declare_variable(compiler);
             
             let func_name = self.previous;
+
+            // Check if the function was defined earlier.
+            // If it was not, push a placeholder (this allows recursion)
+            let i = match heap.get_global_function(&func_name){
+                Some(i)=>i,
+                None =>heap.push(Box::new(Function::new_script(func_name.source_slice())))
+            };
 
             let func  = match function(self, func_name.txt, compiler, heap, packages_dictionary, packages_elements){
                 Some(f)=>f,
@@ -483,7 +489,7 @@ impl <'a>Parser<'a>{
             };
     
             // Push constant.
-            let i = heap.push(Box::new(func));        
+            heap.set(i, Box::new(func)).unwrap();            
     
             // Register the function
             self.emit_byte(Operation::PushHeapRef(i));            
@@ -1390,7 +1396,7 @@ mod tests {
 
             // set jump.
             if let (Operation::JumpIfFalse(v),_) = chunk[1]{
-                assert_eq!(2,v);
+                assert_eq!(1,v);
             }else{assert!(false)};
 
             // Pop variables.
@@ -1669,10 +1675,9 @@ mod tests {
                 txt: &source[3..4],            
                 token_type: TokenType::Identifier,
             };
-            assert_eq!(compiler.local_count(),1);
-            println!("locals[0] -> '{}'", compiler.locals[0].name.source_text());
+            assert_eq!(compiler.local_count(),0);            
             assert_eq!(x_token.source_text(),format!("x"));
-            assert!(compiler.var_is_in_scope(&x_token));
+            
 
             let x = heap.get(0).unwrap()            
                     .as_any()

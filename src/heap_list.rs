@@ -14,6 +14,8 @@ pub struct HeapList {
     first_free : usize,
 }
 
+
+
 impl HeapList {
 
     pub fn new()->Self{        
@@ -49,6 +51,25 @@ impl HeapList {
             }            
         }else{
             None
+        }
+    }
+
+    /// Sets n element in the HeapList
+    pub fn set(&mut self, i: usize, value: Box<dyn ValueTrait>)->Result<(),String>{
+        if self.elements.len() > i {
+            let old_refs = match &self.elements[i]{
+                Some(v)=>v.n_refs,
+                None => 0
+            };
+
+            self.elements[i] = Some(Element {
+                value: value,
+                n_refs: old_refs,
+            });
+            Ok(())
+        }else{
+            return Err(format!("Element out of bounds in HeapList. Setting element {} but there are only {}", i, self.elements.len()))            
+            
         }
     }
 

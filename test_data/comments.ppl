@@ -20,3 +20,5 @@ let double2 = fn(x){
 }
 
 let f = double
+
+io::print(f(3))

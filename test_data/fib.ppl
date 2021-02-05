@@ -1,0 +1,16 @@
+fn fib(n){
+    //io::print(n)
+
+    if n < 2 {
+        return n
+    }else{
+
+        return fib(n - 1) + fib(n - 2)
+    }
+
+}
+
+let y = fib(40)
+
+io::print(y)
+io::print(y == 102334155)

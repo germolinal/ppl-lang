@@ -72,9 +72,10 @@ impl VM {
             /*****************************/
             /* Dissassemble when developing */
             /*****************************/
-            /*
+            
             #[cfg(debug_assertions)]
             {
+                /*
                 // report stack
                 print!("  --> n_frames: {} | Stack: [", frame_n);
                                             
@@ -86,9 +87,10 @@ impl VM {
                 // Report operation                 
                 let code_lines = self.call_frames[frame_n].code_lines().unwrap();               
                 debug::operation(code_lines, ip);                
+                */
             
             }
-            */
+            
             
             /*****************************/
             /*****************************/
@@ -540,10 +542,23 @@ impl VM {
     }
 
     pub fn push(&mut self, value: Value ) {        
+        //#[cfg(degbug_assertions)]
+        {
+            if self.stack.len() == self.stack.capacity(){
+                eprintln!("Extending capacity of Stack")
+            }
+        }
         self.stack.push(value);        
     }
 
     pub fn push_call_frame(&mut self, call_frame: CallFrame ) {        
+        //#[cfg(debug_assertions)]
+        {
+            if self.call_frames.len() == self.call_frames.capacity(){
+                eprintln!("Extending capacity of call_frames");
+            }
+        }
+
         self.call_frames.push(call_frame);        
     }
 
