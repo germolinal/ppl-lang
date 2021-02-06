@@ -3,13 +3,13 @@ use crate::operations::Operation;
 
 pub struct CallFrame{
     function: Function,
-    first_slot: usize,
+    first_slot: u8,
     ip: usize,
 }
 
 impl CallFrame{
         
-    pub fn new(first_slot: usize, function: Function)->Self{
+    pub fn new(first_slot: u8, function: Function)->Self{
         Self{
             function: function,
             first_slot: first_slot,
@@ -17,7 +17,7 @@ impl CallFrame{
         }
     }
 
-    pub fn first_slot(&self)->usize{
+    pub fn first_slot(&self)->u8{
         self.first_slot
     }
 

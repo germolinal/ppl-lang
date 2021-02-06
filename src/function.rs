@@ -62,7 +62,7 @@ impl Function {
         }
     }
     
-    pub fn push_constant(&mut self,v: Box<dyn ValueTrait>, heap: &mut HeapList)->usize{
+    pub fn push_constant(&mut self,v: Box<dyn ValueTrait>, heap: &mut HeapList)->u8{
         match self{
             Function::Native(_)=>panic!("Trying to push constant to a native function"),
             Function::Script(f)=> {
@@ -74,7 +74,7 @@ impl Function {
         }
     }
 
-    pub fn set_n_args(&mut self, n: usize){
+    pub fn set_n_args(&mut self, n: u8){
         match self{
             Function::Native(_)=>panic!("Trying to set the number of arguments on a native function"),
             Function::Script(f)=>{
@@ -111,7 +111,7 @@ impl ValueTrait for Function {
         panic!("Trying to clone a function.")
     }
 
-    fn call(&self, vm: &mut VM, n_args: usize)->Result<usize,String> {
+    fn call(&self, vm: &mut VM, n_args: u8)->Result<u8,String> {
 
         // Call
 

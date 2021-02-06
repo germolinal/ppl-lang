@@ -1,4 +1,4 @@
-
+#[allow(dead_code)]
 pub mod debug {
     //use crate::chunk::Chunk;
     use crate::operations::*;

@@ -4,7 +4,7 @@ use crate::package::{Package, Packages};
 use crate::vm::VM;
 use crate::value_trait::ValueTrait;
 
-fn print(vm: &mut VM, n_args: usize)->usize{
+fn print(vm: &mut VM, n_args: u8)->u8{
         
     let args = vm.get_last_stack(n_args);    
 

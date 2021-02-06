@@ -1,7 +1,7 @@
 use crate::vm::VM;
 
 
-pub type NativeFnType = fn(&mut VM, n_args: usize)->usize;
+pub type NativeFnType = fn(&mut VM, n_args: u8)->u8;
 
 
 pub struct NativeFn{    

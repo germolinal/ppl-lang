@@ -23,22 +23,22 @@ pub enum Operation {
     PushNil,
     PushBool(bool),
     PushNumber(f64),  
-    PushHeapRef(usize),
+    PushHeapRef(u8),
     
-    GetLocal(usize),
-    SetLocal(usize),
-    GetGlobal(usize),
+    GetLocal(u8),
+    SetLocal(u8),
+    GetGlobal(u8),
     GetFromPackage(usize),
 
-    Pop(usize),
-    DefineVars(usize),
+    Pop(u8),
+    DefineVars(u8),
     
-    ForLoop(usize,usize),
-    JumpIfFalse(usize),
-    JumpIfTrue(usize),
-    JumpBack(usize),
+    ForLoop(u8,u8),
+    JumpIfFalse(u8),
+    JumpIfTrue(u8),
+    JumpBack(u8),
 
-    Call(usize),
+    Call(u8),
 }
 
 

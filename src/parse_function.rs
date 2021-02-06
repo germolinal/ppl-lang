@@ -88,7 +88,7 @@ pub fn index(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: 
 /// pushes arguments separated by commas
 /// e.g. arg1, arg2, arg3,...
 /// 
-fn arg_list<'a>(parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, n: &mut usize, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
+fn arg_list<'a>(parser: &mut Parser<'a>, compiler: &mut Compiler<'a>, heap: &mut HeapList, n: &mut u8, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){
     
    
     // Left Paren has been consumed
@@ -242,7 +242,7 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
     // Open main scope
     parser.begin_scope(&mut clean_compiler);
 
-    let mut n_vars : usize = 0;
+    let mut n_vars : u8 = 0;
     
     match parser.current().token_type(){
         // There are variables... declare them (but DO NOT define them)

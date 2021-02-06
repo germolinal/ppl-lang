@@ -5,7 +5,7 @@ use crate::heap_list::HeapList;
 pub struct ScriptFn {
     pub name: String,
     chunk: Chunk,
-    pub n_args: usize,
+    pub n_args: u8,
     //n_outs: usize,
 }
 
@@ -21,7 +21,7 @@ impl ScriptFn {
         }
     }
     
-    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>, heap: &mut HeapList)->usize{
+    pub fn push_to_heap(&mut self, v: Box<dyn ValueTrait>, heap: &mut HeapList)->u8{
         //self.chunk.push_to_heap(v)
         heap.push(v)
     }
@@ -40,7 +40,7 @@ impl ScriptFn {
     }
     */
 
-    pub fn set_n_args(&mut self, n_args: usize){
+    pub fn set_n_args(&mut self, n_args: u8){
         self.n_args = n_args
     }
         

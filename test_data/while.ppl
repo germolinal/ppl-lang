@@ -1,0 +1,10 @@
+
+let a = 1
+
+while a < 9999999 {
+    //io::print(a)
+
+    a = a + 1
+}
+
+io::print(123)

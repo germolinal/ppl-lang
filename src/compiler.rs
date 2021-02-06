@@ -104,7 +104,7 @@ impl <'a>Compiler<'a> {
     }
 
     /// Retrieves the position of a local variable in the scope    
-    pub fn get_local(&self, var: &Token) -> Option<usize> {
+    pub fn get_local(&self, var: &Token) -> Option<u8> {
             
         let var_slice = var.source_slice();
 
@@ -118,7 +118,7 @@ impl <'a>Compiler<'a> {
             // if not the same length, don't bother
             if local.name.length == var.length {
                 if var_slice == local.name.source_slice(){
-                    return Some(i)
+                    return Some(i as u8)
                 }
             }
         }

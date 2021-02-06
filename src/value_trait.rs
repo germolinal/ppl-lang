@@ -13,7 +13,7 @@ pub trait ValueTrait {
     // Copy and clone
     fn clone_to_value(&self)->Value;
 
-    fn call(&self, _h: &mut VM, _n: usize)->Result<usize,String>{
+    fn call(&self, _h: &mut VM, _n: u8)->Result<u8,String>{
         Err(format!("Cannot Call type '{}'... it is not a Function", self.type_name()))
     }
 

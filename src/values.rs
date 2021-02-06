@@ -22,7 +22,7 @@ pub enum Value {
     Bool(Boolean),
         
     /// A reference to an object allocated in the heap
-    HeapRef(usize),    
+    HeapRef(u8),    
 
     /// A reference to an object allocated in the 
     /// package elements vector

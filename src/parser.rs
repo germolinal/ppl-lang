@@ -453,7 +453,7 @@ impl <'a>Parser<'a>{
             },
             TokenType::Let => {
                 self.advance();
-                let mut n : usize= 0;
+                let mut n : u8 = 0;
                 self.var_declaration(compiler, heap, true, &mut n, packages_dictionary, packages_elements);
             },
             _ => {                                
@@ -510,7 +510,7 @@ impl <'a>Parser<'a>{
     ///     
     /// # EBNF Grammar
     /// var_declaration -> "let" IDENTIFIER ("=" expression)
-    pub fn var_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, define: bool, n_declared_vars : &mut usize, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){        
+    pub fn var_declaration(&mut self, compiler: &mut Compiler<'a>, heap: &mut HeapList, define: bool, n_declared_vars : &mut u8, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>){        
         
         // Get the token representing the name
         if !self.consume(TokenType::Identifier){
@@ -573,7 +573,7 @@ impl <'a>Parser<'a>{
         let while_start = match self.chunk_len(){
             Some(i)=>i,
             None => return
-        };
+        } ;
 
         // Compile expression (puts a boolean on the stack)
         self.expression(compiler, heap, packages_dictionary, packages_elements);
@@ -586,7 +586,7 @@ impl <'a>Parser<'a>{
         let body_start = match self.chunk_len(){
             Some(i)=>i,
             None => return
-        };
+        } as u8;
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
@@ -597,19 +597,26 @@ impl <'a>Parser<'a>{
         self.block(compiler, heap, packages_dictionary, packages_elements);        
         self.end_scope(compiler);
 
+        
+        
+        // Remove the boolean (i.e. result of expression)
+        // driving this loop
+        self.emit_byte(Operation::Pop(1));
+        
         // Mark the end
         let body_end = match self.chunk_len(){
             Some(i)=>i,
             None => return
-        };
+        } as u8;
 
         // Add jump back, before the expression
-        self.emit_byte(Operation::JumpBack(body_end - while_start));
+        let aux : u8 = body_end as u8 - while_start as u8 ;
+        self.emit_byte(Operation::JumpBack(aux + 1));
         
         // Patch jump
         let body_length = body_end - body_start;
         //self.chunk().patch_code(body_start-1 ,Operation::JumpIfFalse(body_length+2)); // Jumping the JumpBack
-        self.patch_chunk(body_start-1, Operation::JumpIfFalse(body_length+2));
+        self.patch_chunk((body_start-1) as usize, Operation::JumpIfFalse(body_length + 1));
     }
 
     /// Compiles an If statement
@@ -648,7 +655,7 @@ impl <'a>Parser<'a>{
         // Patch jump
         let body_length = body_end - body_start;
         //self.chunk().patch_code(body_start-1 ,Operation::JumpIfFalse(body_length+1)); 
-        self.patch_chunk(body_start-1, Operation::JumpIfFalse(body_length)); 
+        self.patch_chunk(body_start-1, Operation::JumpIfFalse(body_length as u8)); 
 
         // check else
         if self.consume(TokenType::Else){
@@ -683,7 +690,7 @@ impl <'a>Parser<'a>{
             // Patch jump
             let body_length = body_end - body_start;
             //self.chunk().patch_code(body_start-1 ,Operation::JumpIfTrue(body_length+1)); 
-            self.patch_chunk(body_start-1, Operation::JumpIfTrue(body_length));
+            self.patch_chunk(body_start-1, Operation::JumpIfTrue(body_length as u8));
 
             
         }
@@ -703,7 +710,7 @@ impl <'a>Parser<'a>{
         self.begin_scope(compiler);
 
         // consume declare the variables
-        let mut n_declared_vars : usize = 0;
+        let mut n_declared_vars : u8 = 0;
         self.var_declaration(compiler, heap, true, &mut n_declared_vars, packages_dictionary, packages_elements);                
         
         // consume 'in', or fail
@@ -744,7 +751,7 @@ impl <'a>Parser<'a>{
 
         // emit Loop operation
         let body_length = body_end - body_start;
-        self.emit_byte(Operation::ForLoop(n_declared_vars, body_length))
+        self.emit_byte(Operation::ForLoop(n_declared_vars, body_length as u8))
 
 
     }
@@ -1140,7 +1147,7 @@ mod tests {
         // (done in self.declaration())
         parser.advance();
         
-        let mut n : usize= 0;
+        let mut n : u8 = 0;
         parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);        
 
@@ -1157,7 +1164,7 @@ mod tests {
         // (done in self.declaration())
         parser.advance();
         
-        let mut n : usize= 0;
+        let mut n : u8 = 0;
         parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);
 
@@ -1240,7 +1247,7 @@ mod tests {
         let mut packages_dictionary : Packages = HashMap::new();
 
         parser.advance();parser.advance();
-        let mut n : usize = 0;
+        let mut n : u8 = 0;
         parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,3);
 
@@ -1353,7 +1360,7 @@ mod tests {
 
         // Check if there is a let, and consume it.
         assert!(parser.match_token(TokenType::Let));        
-        let mut n : usize= 0;
+        let mut n : u8 = 0;
         parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);
 
@@ -1366,7 +1373,7 @@ mod tests {
 
         // declare Z (check that there is a LET, and consume it first)
         assert!(parser.match_token(TokenType::Let));       
-        let mut n : usize= 0;
+        let mut n : u8 = 0;
         parser.var_declaration(&mut compiler, &mut heap, true, &mut n, &mut packages_dictionary, &mut packages_elements);
         assert_eq!(n,1);
     }
@@ -1628,7 +1635,7 @@ mod tests {
 
             
             if let (Operation::PushHeapRef(v),_) = chunk[0] {
-                assert_eq!(v, 1 as usize);                
+                assert_eq!(v, 1 as u8);                
                 match heap.get(v){
                     Some(_s)=>{
                         
@@ -1676,7 +1683,7 @@ mod tests {
                 txt: &source[3..4],            
                 token_type: TokenType::Identifier,
             };
-            assert_eq!(compiler.local_count(),0);            
+            assert_eq!(compiler.local_count(),1);            
             assert_eq!(x_token.source_text(),format!("x"));
             
 
