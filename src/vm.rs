@@ -5,6 +5,7 @@ use crate::value_trait::ValueTrait;
 use crate::call_frame::CallFrame;
 use crate::function::Function;
 use crate::heap_list::HeapList;
+use crate::stack::Stack;
 
 #[cfg(debug_assertions)]
 use crate::debug::*;
@@ -17,8 +18,8 @@ pub enum InterpretResult {
 
 
 pub struct VM {
-    call_frames: Vec<CallFrame>,
-    stack: Vec<Value>,    
+    call_frames: Stack<CallFrame>,
+    stack: Stack<Value>,    
 }
 
 
@@ -27,8 +28,8 @@ impl VM {
     pub fn new()-> Self{
                     
         Self {            
-            call_frames: Vec::with_capacity(u8::MAX as usize),
-            stack: Vec::with_capacity(u8::MAX as usize),                                    
+            call_frames: Stack::new(),//Vec::with_capacity(u8::MAX as usize),
+            stack: Stack::new()//Vec::with_capacity(u8::MAX as usize),                                    
         }
 
     }    
@@ -100,8 +101,8 @@ impl VM {
         */                          
     }
 
-    fn jump_if_false(&mut self, n: u8, frame_n: &usize)->Result<(),String>{
-        if let Value::Bool(v) = self.stack.last().unwrap() {
+    fn jump_if_false(&mut self, n: u8, frame_n: &u8)->Result<(),String>{
+        if let Value::Bool(v) = self.stack.last() {
             if !(*v) {                            
                 self.call_frames[*frame_n].jump_forward(n as usize);
             }
@@ -112,8 +113,8 @@ impl VM {
         }
     }
 
-    fn jump_if_true(&mut self, n: u8, frame_n: &usize)->Result<(),String>{
-        if let Value::Bool(v) = self.stack.last().unwrap() {
+    fn jump_if_true(&mut self, n: u8, frame_n: &u8)->Result<(),String>{
+        if let Value::Bool(v) = self.stack.last() {
             if *v {                            
                 self.call_frames[*frame_n].jump_forward(n as usize);
             }
@@ -125,12 +126,15 @@ impl VM {
     }
 
     fn pop_n(&mut self, n: u8)->Result<(),String>{
+        self.stack.drop_n(n)
+        /*
         for _ in 0..n {
             if let Err(e) = self.pop(){
                 return Err(format!("{}",e))
             }
         }
         Ok(())
+        */
     }
 
     fn define_vars(&mut self, n: u8)->Result<(),String>{
@@ -383,7 +387,7 @@ impl VM {
 
     /// Gets a local variable
     fn get_local(&mut self, absolute_position: u8, heap: &mut HeapList)->Result<(),String>{
-        let local = self.stack[absolute_position as usize];
+        let local = self.stack[absolute_position];
         // Check if it has been initialized
         if local.is_nil() {
             return Err(format!("Trying to use an uninitialized (i.e. Nil) variable"));
@@ -405,7 +409,7 @@ impl VM {
                 
         // If this value, which will be removed, pointed to 
         // the heap, let the heap know
-        if let Value::HeapRef(heap_ref) = self.stack[absolute_position as usize] {
+        if let Value::HeapRef(heap_ref) = self.stack[absolute_position] {
             heap.drop_reference(heap_ref);
         }
 
@@ -418,7 +422,7 @@ impl VM {
         }
 
         // Replace
-        self.stack[absolute_position as usize] = self.stack[last];//self.pop().unwrap();                                                                                                                 
+        self.stack[absolute_position] = self.stack[last];//self.pop().unwrap();                                                                                                                 
         Ok(())
     }
 
@@ -439,8 +443,8 @@ impl VM {
     }
 
     /// Calls a function
-    fn call(&mut self, n_vars: u8, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut usize, advance: &mut bool)->Result<(),String>{
-        let f_ref = self.stack[ self.stack.len() - n_vars as usize - 1 ];
+    fn call(&mut self, n_vars: u8, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
+        let f_ref = self.stack[ self.stack.len() as u8 - n_vars - 1 ];
 
         match f_ref {
             Value::HeapRef(i) => {
@@ -474,12 +478,14 @@ impl VM {
                         }                        
                         
                         // Pop all the arguments given.
-                        for _ in 0..n_vars{
-                            self.pop().unwrap();
-                        }
+                        //for _ in 0..n_vars{
+                            //self.pop().unwrap();                            
+                        //}
+                        self.stack.drop_n(n_vars).unwrap();
 
                         // And the function itself.
-                        self.pop().unwrap();
+                        //self.pop().unwrap();
+                        self.stack.drop_last().unwrap();
 
                         // Push result
                         self.push(ret);
@@ -506,7 +512,7 @@ impl VM {
 
 
     /// Grabs an operation and performs the appropriate action
-    fn perform_operation(&mut self, current_operation: Operation, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut usize, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
+    fn perform_operation(&mut self, current_operation: Operation, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
         match current_operation {
             Operation::Return => {                                       
                 unreachable!();                
@@ -604,7 +610,7 @@ impl VM {
                 Ok(())
             },                    
             Operation::PushHeapRef(i)=>{
-                self.stack.push(Value::HeapRef(i));
+                self.stack.push(Value::HeapRef(i)).unwrap();
                 Ok(())
             },                 
             Operation::Call(n_vars)=>{
@@ -642,9 +648,9 @@ impl VM {
                 break;
             }   
 
-            /*****************************/
+            /********************************/
             /* Dissassemble when developing */
-            /*****************************/
+            /********************************/
             
             #[cfg(debug_assertions)]
             {
@@ -652,8 +658,9 @@ impl VM {
                 // report stack
                 print!("  --> n_frames: {} | Stack: [", frame_n);
                                             
-                for val in self.stack.iter() {                    
-                    print!("{}, ", val.to_string());                    
+                for val in 0..self.stack.len() {                    
+                    let v = self.stack[val];
+                    print!("{}, ", v.to_string());                    
                 }
                 print!("]\n");
 
@@ -678,13 +685,15 @@ impl VM {
                     let ret_value = self.pop().unwrap();
                                             
                     // Restore stack to what was before this                                         
-                    while self.stack.len() > self.call_frames[frame_n].first_slot() as usize{
-                        self.pop().unwrap();
+                    while self.stack.len() > self.call_frames[frame_n].first_slot(){
+                        //self.pop().unwrap();
+                        self.stack.drop_last().unwrap();
                     }                   
                     
                     // (and also the function) itself
                     if self.stack.len() > 0 {
-                        self.pop().unwrap();
+                        //self.pop().unwrap();
+                        self.stack.drop_last().unwrap();
                     }
 
                     // Go back one call_frame
@@ -721,25 +730,25 @@ impl VM {
         
     }
 
-    pub fn push(&mut self, value: Value ) {        
-        //#[cfg(degbug_assertions)]
-        {
-            if self.stack.len() == self.stack.capacity(){
-                eprintln!("Extending capacity of Stack")
-            }
+    pub fn push(&mut self, value: Value ) {                
+        match self.stack.push(value){
+            Ok(_)=>{},
+            Err(e)=>panic!(format!("Stack: {}", e))
         }
-        self.stack.push(value);        
     }
 
     pub fn push_call_frame(&mut self, call_frame: CallFrame ) {        
         //#[cfg(debug_assertions)]
         {
-            if self.call_frames.len() == self.call_frames.capacity(){
+            if self.call_frames.len() == u8::MAX{
                 eprintln!("Extending capacity of call_frames");
             }
         }
 
-        self.call_frames.push(call_frame);        
+        match self.call_frames.push(call_frame){
+            Ok(_)=>{},
+            Err(e)=>panic!(format!("CallFrame: {} ", e))
+        };        
     }
 
     pub fn pop_call_frame(&mut self) ->Result<CallFrame, &str> {        
@@ -759,10 +768,8 @@ impl VM {
         }
     }
 
-    pub fn get_last_stack(&self, n: u8)->&[Value]{
-        let fin = self.stack.len();
-        let ini = fin - n as usize;
-        &self.stack[ini..fin]
+    pub fn get_last_stack(&self, n: u8)->&[Option<Value>]{
+        self.stack.last_n(n)
     }
 
     

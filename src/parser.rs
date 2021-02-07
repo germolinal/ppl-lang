@@ -1454,9 +1454,14 @@ mod tests {
                 assert_eq!(0,n);
             }else{assert!(false)};
 
+            // Pop expression driving the while loop.
+            if let (Operation::Pop(n),_) = chunk[3]{
+                assert_eq!(1,n);
+            }else{assert!(false)};
+
             // Jump back.
-            if let (Operation::JumpBack(n),_) = chunk[3]{
-                assert_eq!(3,n);
+            if let (Operation::JumpBack(n),_) = chunk[4]{
+                assert_eq!(5,n);
             }else{assert!(false)};
 
             

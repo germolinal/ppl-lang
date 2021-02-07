@@ -27,4 +27,5 @@ pub mod package;
 pub mod heap_list;
 pub mod call_frame;
 pub mod vm;
+mod stack;
 pub mod compiler;

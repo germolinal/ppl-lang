@@ -37,7 +37,7 @@ impl HeapList {
         }
     }    
 
-    /// Returns the number of elements in the 
+    /// Returns the number of elements in the HeapList
     pub fn len(&self)->u8{
         self.n_elements
     }

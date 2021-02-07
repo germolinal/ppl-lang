@@ -9,7 +9,7 @@ fn print(vm: &mut VM, n_args: u8)->u8{
     let args = vm.get_last_stack(n_args);    
 
     for arg in args{        
-        print!("{} ",arg.to_string());
+        print!("{} ",arg.unwrap().to_string());
     }
     println!("");
 
