@@ -9,6 +9,7 @@ use crate::chunk::Chunk;
 use crate::vm::VM;
 use crate::heap_list::HeapList;
 
+#[derive(Clone)]
 pub enum Function{
     Native(Rc<NativeFn>),
     Script(Rc<ScriptFn>)

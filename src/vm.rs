@@ -25,11 +25,11 @@ pub struct VM {
 
 impl VM {
     
-    pub fn new()-> Self{
+    pub fn new()-> Self {
                     
         Self {            
-            call_frames: Stack::new(),//Vec::with_capacity(u8::MAX as usize),
-            stack: Stack::new()//Vec::with_capacity(u8::MAX as usize),                                    
+            call_frames: Stack::new(),
+            stack: Stack::new()
         }
 
     }    
@@ -157,6 +157,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline]
     fn negate(&mut self)->Result<(),String>{
         match self.pop(){
             Ok(v) => match v.negate(){
@@ -170,6 +171,7 @@ impl VM {
         }   
     }
 
+    #[inline]
     fn not(&mut self)->Result<(),String>{
         match self.pop(){
             Ok(v) => match v.not(){
@@ -183,6 +185,7 @@ impl VM {
         }  
     }
 
+    #[inline]
     fn add(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();                    
@@ -195,6 +198,7 @@ impl VM {
         }  
     }
 
+    #[inline]
     fn subtract(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -207,6 +211,7 @@ impl VM {
         }      
     }
 
+    #[inline]
     fn multiply(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -219,6 +224,7 @@ impl VM {
         }   
     }
 
+    #[inline]
     fn divide(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -232,6 +238,7 @@ impl VM {
     }
 
 
+    #[inline]
     fn equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -244,6 +251,7 @@ impl VM {
         }      
     }
 
+    #[inline]
     fn not_equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -256,6 +264,7 @@ impl VM {
         }       
     }
 
+    #[inline]
     fn greater(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -268,6 +277,7 @@ impl VM {
         }   
     }
 
+    #[inline]
     fn less(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -280,6 +290,7 @@ impl VM {
         }    
     }
 
+    #[inline]
     fn greater_equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -292,6 +303,7 @@ impl VM {
         }
     }
 
+    #[inline]
     fn less_equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -304,6 +316,7 @@ impl VM {
         }   
     }
 
+    #[inline]
     fn and(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -331,6 +344,7 @@ impl VM {
         }
     }
 
+    #[inline]
     fn or(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -376,9 +390,7 @@ impl VM {
                 // in business as usual.                       
                 let first_slot = self.stack.len() as u8 - n_vars;                  
                 self.push_call_frame(CallFrame::new(first_slot,function));                        
-                
-                //self.run();
-                //self.pop_call_frame().unwrap();
+                                
                 Ok(())
             },
             Err(e)=>Err(e)
@@ -437,7 +449,7 @@ impl VM {
     }
 
     /// Gets a value from package
-    fn get_from_package(&mut self, i: usize)->Result<(),String>{
+    fn get_from_package(&mut self, i: i16)->Result<(),String>{
         self.push(Value::PackageRef(i));
         Ok(())
     }
@@ -462,7 +474,7 @@ impl VM {
             Value::PackageRef(i) => {
                                 
                 // get the function from the surrounding function (i.e. the current one)                                                                        
-                let function = packages_elements[i].clone_rc();
+                let function = packages_elements[i as usize].clone_rc();
                 
                 // Native functions don't push a callframe.
                 match function.call(self,n_vars){
@@ -510,6 +522,34 @@ impl VM {
         Ok(())
     }
 
+    /// Return operation
+    fn return_op(&mut self, frame_n: &mut u8)->Result<(),String>{
+        
+                            
+        // Get the value
+        let ret_value = match self.pop(){
+            Ok(v)=>v,
+            Err(e)=>return Err(e.to_string()),
+        };
+                
+        // Whatever was added + the name of the function
+        let n_drops = 1 + self.stack.len() - self.call_frames[*frame_n].first_slot();
+        if let Err(msg) = self.stack.drop_n(n_drops){
+            return Err(msg);
+        }
+        
+        // Go back one call_frame
+        if let Err(msg) = self.drop_call_frame(){
+            return Err(msg.to_string());
+        }          
+
+        *frame_n -= 1;
+        
+        self.push(ret_value);
+
+        Ok(())                                
+        
+    }
 
     /// Grabs an operation and performs the appropriate action
     fn perform_operation(&mut self, current_operation: Operation, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
@@ -642,8 +682,8 @@ impl VM {
 
             // Get some general data            
             let first_call_frame_slot = self.call_frames[frame_n].first_slot();
-            let ip = self.call_frames[frame_n].ip();
-
+            let ip = self.call_frames[frame_n].ip_index();
+            
             if ip >= self.call_frames[frame_n].n_operations().unwrap(){                                
                 break;
             }   
@@ -676,33 +716,15 @@ impl VM {
             /*****************************/
             /*****************************/
 
-            let (current_operation, _)=self.call_frames[frame_n].current_instruction_and_line().unwrap();
+            let (current_operation, _)=self.call_frames[frame_n].current_instruction_and_line().unwrap();            
             
-            if let Operation::Return = current_operation{
+            if let Operation::Return = current_operation {
                 /* IF THIS SI THE RETURN FROM A FUNCTION */
                 if frame_n > 0 {                        
-                    // Get the value
-                    let ret_value = self.pop().unwrap();
-                                            
-                    // Restore stack to what was before this                                         
-                    while self.stack.len() > self.call_frames[frame_n].first_slot(){
-                        //self.pop().unwrap();
-                        self.stack.drop_last().unwrap();
-                    }                   
-                    
-                    // (and also the function) itself
-                    if self.stack.len() > 0 {
-                        //self.pop().unwrap();
-                        self.stack.drop_last().unwrap();
+                    match self.return_op(&mut frame_n){
+                        Ok(_)=>{},
+                        Err(e)=>return InterpretResult::RuntimeError(e)
                     }
-
-                    // Go back one call_frame
-                    self.pop_call_frame().unwrap();                        
-                    frame_n -= 1;
-                    
-
-                    self.push(ret_value);
-                                        
                 }else{
                     /* OTHERWISE, RETURN FROM THE PROGRAM */
                     return InterpretResult::Ok(1);
@@ -723,13 +745,14 @@ impl VM {
 
         }// end of loop.
 
+        
         let current_function = self.call_frames[frame_n].function();
         let f_name = current_function.get_name();
 
-        return InterpretResult::RuntimeError(format!("No RETURN operation found in function '{}'", f_name));
+        return InterpretResult::RuntimeError(format!("No RETURN operation found in function '{}' (this is a bug, not a user error)", f_name));
         
     }
-
+    
     pub fn push(&mut self, value: Value ) {                
         match self.stack.push(value){
             Ok(_)=>{},
@@ -738,25 +761,19 @@ impl VM {
     }
 
     pub fn push_call_frame(&mut self, call_frame: CallFrame ) {        
-        //#[cfg(debug_assertions)]
-        {
-            if self.call_frames.len() == u8::MAX{
-                eprintln!("Extending capacity of call_frames");
-            }
-        }
-
+       
         match self.call_frames.push(call_frame){
             Ok(_)=>{},
             Err(e)=>panic!(format!("CallFrame: {} ", e))
         };        
     }
 
-    pub fn pop_call_frame(&mut self) ->Result<CallFrame, &str> {        
-        if let Some(v) = self.call_frames.pop(){
-            Ok(v)
-        }else{
-            Err("Trying to pop an empty CallFrame stack")
+    pub fn drop_call_frame(&mut self) ->Result<(), String> {        
+        
+        if let Err(msg) = self.call_frames.drop_last(){
+            return Err(format!("StackFrame: {}", msg));
         }
+        Ok(())
     }
 
         

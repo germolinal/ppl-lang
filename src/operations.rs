@@ -1,4 +1,5 @@
 //use crate::token::Token;
+use crate::number::Number;
 
 /// Lists the operations available for the virtual machine
 #[repr(u8)]
@@ -22,13 +23,13 @@ pub enum Operation {
         
     PushNil,
     PushBool(bool),
-    PushNumber(f64),  
+    PushNumber(Number),  
     PushHeapRef(u8),
     
     GetLocal(u8),
     SetLocal(u8),
     GetGlobal(u8),
-    GetFromPackage(usize),
+    GetFromPackage(i16),
 
     Pop(u8),
     DefineVars(u8),

@@ -38,7 +38,7 @@ impl <T>Stack<T>{
     
 
     /// Pops (and returns) the last element 
-    #[inline]
+    ///#[inline]
     pub fn pop(&mut self)->Option<T>{
         if self.len == 0 {
             None
@@ -53,7 +53,7 @@ impl <T>Stack<T>{
     /// Drops the last element 
     /// 
     /// It is like Pop, but does not return anything
-    #[inline]
+    ///#[inline]
     pub fn drop_last(&mut self)->Result<(),String>{
         if self.len == 0 {
             Err(format!("Trying to drop last element of an empty stack"))
@@ -66,7 +66,7 @@ impl <T>Stack<T>{
     /// Drops N elements at the end
     /// 
     /// It is like Pop, but drops several and does not return anything
-    #[inline]
+    ///#[inline]
     pub fn drop_n(&mut self, n : u8)->Result<(),String>{
         if self.len == 0 {
             Err(format!("Trying to drop last element of an empty stack"))
@@ -78,7 +78,7 @@ impl <T>Stack<T>{
 
     /// Pushes an element to the stack
     /// 
-    #[inline]
+    ///#[inline]
     pub fn push(&mut self, value: T) -> Result<(),String>{
         // Check if it is full
         if self.len == self.elements.len() as u8 {
@@ -102,6 +102,7 @@ impl <T>Stack<T>{
         }
     }
 
+    /// Borrows a slice containing the last N elements in the stack
     pub fn last_n(&self, n: u8)->&[Option<T>]{
         let fin = self.len as usize;
         let ini = fin - n as usize;

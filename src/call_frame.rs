@@ -1,19 +1,29 @@
+
 use crate::function::Function;
 use crate::operations::Operation;
 
+#[derive(Clone)]
 pub struct CallFrame{
+
+    /// The function associated to this CallFrame
     function: Function,
+    
+    /// The first element in the stack corresponding
+    /// to this callframe
     first_slot: u8,
-    ip: usize,
+    
+    /// The index of the line/operation
+    ip_index: usize,
+    
 }
 
 impl CallFrame{
         
-    pub fn new(first_slot: u8, function: Function)->Self{
+    pub fn new(first_slot: u8, function: Function)->Self{        
         Self{
             function: function,
             first_slot: first_slot,
-            ip: 0
+            ip_index: 0,            
         }
     }
 
@@ -21,10 +31,10 @@ impl CallFrame{
         self.first_slot
     }
 
-    pub fn ip(&self)->usize{
-        self.ip
+    pub fn ip_index(&self)->usize{
+        self.ip_index
     }
-
+    
     pub fn n_operations(&self)->Result<usize, String>{
         if self.function.is_native(){
             return Err(format!("Trying to get the number of operations out of function '{}' which is native", self.function.get_name()));
@@ -51,22 +61,22 @@ impl CallFrame{
             return Err(format!("Trying to get Operation from function '{}' which is native", self.function.get_name()));
         }else{
             let ops_lines =self.function.chunk().unwrap().as_slice();
-            let i = self.ip;
-            Ok(ops_lines[i])
+            let i = self.ip_index;
+            Ok(ops_lines[i])            
         }
     }
 
     /// Increases the callframe 'ip' value by 'n'
     pub fn jump_forward(&mut self, n: usize){
-        self.ip += n;
+
+        debug_assert!(self.ip_index + n < self.n_operations().unwrap());
+        self.ip_index += n;        
     }
 
     /// Reduces the callframe 'ip' value by 'n'
     pub fn jump_backwards(&mut self, n: usize){
-        if self.ip < n {
-            panic!("Trying to set a CallFrame's 'ip' to a negative value")
-        }
-        self.ip -= n;
+        debug_assert!(self.ip_index < n);            
+        self.ip_index -= n;        
     }
 
 

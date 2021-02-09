@@ -1,3 +1,4 @@
+use crate::number::Number;
 use crate::heap_list::HeapList;
 use crate::parser::*;
 use crate::token::*;
@@ -69,7 +70,7 @@ pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _he
 /// Parses a number... does not use the 'can_assign'
 pub fn number(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     let v = parser.previous().source_text();            
-    let the_v = match v.parse::<f64>(){
+    let the_v = match v.parse::<Number>(){
         Ok(v)=>v,
         Err(msg)=>{
             return parser.error_at_current(msg.to_string());
