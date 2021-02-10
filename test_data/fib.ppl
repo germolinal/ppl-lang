@@ -6,7 +6,7 @@ fn fib(n){
     }
 }
 
-let y = fib(4)
+let y = fib(40)
 
 io::print(y)
 io::print(y == 102334155)

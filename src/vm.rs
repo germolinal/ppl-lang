@@ -91,7 +91,7 @@ impl VM {
         */                          
     }
 
-    #[inline]
+    //#[inline]
     fn jump_if_false(&mut self, n: u8, frame_n: &u8)->Result<(),String>{
         if let Value::Bool(v) = self.stack.last() {
             if !(*v) {                            
@@ -104,7 +104,7 @@ impl VM {
         }
     }
 
-    #[inline]
+    //#[inline]
     fn jump_if_true(&mut self, n: u8, frame_n: &u8)->Result<(),String>{
         if let Value::Bool(v) = self.stack.last() {
             if *v {                            
@@ -117,7 +117,7 @@ impl VM {
         }
     }
 
-    #[inline]
+    //#[inline]
     fn pop_n(&mut self, n: u8)->Result<(),String>{
         self.stack.drop_n(n)        
     }
@@ -142,7 +142,7 @@ impl VM {
         Ok(())
     }
 
-    #[inline]
+    //#[inline]
     fn negate(&mut self)->Result<(),String>{
         match self.pop(){
             Ok(v) => match v.negate(){
@@ -156,7 +156,7 @@ impl VM {
         }   
     }
 
-    #[inline]
+    //#[inline]
     fn not(&mut self)->Result<(),String>{
         match self.pop(){
             Ok(v) => match v.not(){
@@ -170,7 +170,7 @@ impl VM {
         }  
     }
 
-    #[inline]
+    //#[inline]
     fn add(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();                    
@@ -183,7 +183,7 @@ impl VM {
         }  
     }
 
-    #[inline]
+    //#[inline]
     fn subtract(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -196,7 +196,7 @@ impl VM {
         }      
     }
 
-    #[inline]
+    //#[inline]
     fn multiply(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -209,7 +209,7 @@ impl VM {
         }   
     }
 
-    #[inline]
+    //#[inline]
     fn divide(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -223,7 +223,7 @@ impl VM {
     }
 
 
-    #[inline]
+    //#[inline]
     fn equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -236,7 +236,7 @@ impl VM {
         }      
     }
 
-    #[inline]
+    //#[inline]
     fn not_equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -249,7 +249,7 @@ impl VM {
         }       
     }
 
-    #[inline]
+    //#[inline]
     fn greater(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -262,7 +262,7 @@ impl VM {
         }   
     }
 
-    #[inline]
+    //#[inline]
     fn less(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -275,7 +275,7 @@ impl VM {
         }    
     }
 
-    #[inline]
+    //#[inline]
     fn greater_equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -288,7 +288,7 @@ impl VM {
         }
     }
 
-    #[inline]
+    //#[inline]
     fn less_equal(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -424,7 +424,7 @@ impl VM {
     }
 
     /// Gets a global variable
-    #[inline]
+    //#[inline]
     fn get_global(&mut self, i: u8, heap: &mut HeapList)->Result<(),String>{
         if !heap.get(i).unwrap().is_function(){
             return Err( "Trying to get a reference to a non-function global variable".to_string() )
@@ -435,7 +435,7 @@ impl VM {
     }
 
     /// Gets a value from package
-    #[inline]
+    //#[inline]
     fn get_from_package(&mut self, i: i16)->Result<(),String>{
         self.push(Value::PackageRef(i));
         Ok(())

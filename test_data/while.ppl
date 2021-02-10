@@ -1,9 +1,7 @@
 
 let a = 1
 
-while a < 99999999 {
-    //io::print(a)
-
+while a < 99999999 {    
     a = a + 1
 }
 
