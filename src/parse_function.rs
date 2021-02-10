@@ -30,12 +30,12 @@ pub fn unary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Comp
             parser.emit_byte(Operation::Not);
         },
         _ => {
-            parser.internal_error_at_current(format!("Unknown Token in unary()")) 
+            parser.internal_error_at_current("Unknown Token in unary()".to_string()) 
         }
     };
 }
 
-pub fn string<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
+pub fn string(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     /*
     let v = parser.previous().source_text();                
     parser.emit_byte(Operation::PushString(Box::new(v)));
@@ -43,7 +43,7 @@ pub fn string<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _h
     unimplemented!();
 }
 
-pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
+pub fn array(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
     unimplemented!();
     /*
     //parser.advance();
@@ -55,11 +55,11 @@ pub fn array<'a>(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _he
         n +=1;
         
         if !parser.consume(TokenType::Comma) && !parser.check(TokenType::RightBracket) {
-            parser.error_at_current(format!("Expecting ',' between Array elements."));
+            parser.error_at_current( "Expecting ',' between Array elements.".to_string() );
         }
         
         if parser.check(TokenType::EOF){
-            parser.error_at_current(format!("Expecting ']' at the end of Array"));
+            parser.error_at_current( "Expecting ']' at the end of Array".to_string() );
         }
     }
     
@@ -124,7 +124,7 @@ pub fn call<'a>(_can_assign: bool, parser:&mut Parser<'a>, compiler: &mut Compil
         arg_list(parser, compiler, heap, &mut n_args, packages_dictionary, packages_elements);    
     }
     if !parser.consume(TokenType::RightParen){
-        parser.error_at_current(format!("Expected ')' after argument list in function call"));
+        parser.error_at_current("Expected ')' after argument list in function call".to_string());
     }
     
 
@@ -139,7 +139,7 @@ pub fn grouping<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut C
     // left paren has been consumed
     parser.expression(compiler, heap, packages_dictionary, packages_elements);
     if !parser.consume(TokenType::RightParen) {
-        parser.error_at_current(format!("Expected ')' after expression"));
+        parser.error_at_current( "Expected ')' after expression".to_string() );
     }
 }
 
@@ -154,7 +154,7 @@ pub fn binary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Com
     let rule = parser.get_rule(operator_type);
     match rule.next_precedence{
         Some(precedence)=>parser.parse_precedence(compiler, precedence, heap, packages_dictionary, packages_elements),
-        None => parser.internal_error_at_current(format!("No next precedence found for binary operation"))
+        None => parser.internal_error_at_current("No next precedence found for binary operation".to_string())
     }
 
     // emit operation
@@ -195,7 +195,7 @@ pub fn binary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Com
         TokenType::Or => {
             parser.emit_byte(Operation::Or);
         },
-        _ => parser.internal_error_at_current(format!("Unknown Token for Binary operation"))
+        _ => parser.internal_error_at_current("Unknown Token for Binary operation".to_string())
     }
     
 }
@@ -207,7 +207,7 @@ pub fn literal(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, _heap:
     match parser.previous().token_type(){
         TokenType::False => parser.emit_byte(Operation::PushBool(false)),
         TokenType::True => parser.emit_byte(Operation::PushBool(true)),        
-        _ => parser.internal_error_at_current(format!("Unknown Token in literal()")) 
+        _ => parser.internal_error_at_current("Unknown Token in literal()".to_string()) 
     }
 }
 
@@ -218,7 +218,7 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
     // both 'let x = fn(){}' and 'fn ID(){}'
     // this becomes { let args[]; ...body...  }    
     if !parser.consume(TokenType::LeftParen){
-        parser.error_at_current(format!("Expecting '(' when defining function"));        
+        parser.error_at_current("Expecting '(' when defining function".to_string());        
         return None;
     }
 
@@ -251,20 +251,20 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
         // Nothing to declare
         TokenType::RightParen => {},
         _ => {
-            parser.error_at_current(format!("Expecting ')' or Variable Identifiers after '(' in function declaration."));        
+            parser.error_at_current( "Expecting ')' or Variable Identifiers after '(' in function declaration.".to_string());        
             return None;
         }
     }
     
     
     if !parser.consume(TokenType::RightParen){
-        parser.error_at_current(format!("Expecting ')' after variable list in function declaration"));        
+        parser.error_at_current( "Expecting ')' after variable list in function declaration".to_string() );        
         return None;
     }
 
     // Now the body of the function
     if !parser.consume(TokenType::LeftBrace){
-        parser.error_at_current(format!("Expecting '{{' for opening body of function"));        
+        parser.error_at_current( "Expecting '{{' for opening body of function".to_string() );        
         return None;
     }
 
@@ -306,7 +306,7 @@ pub fn function<'a>(parser : &mut Parser<'a>, name: &'a [u8], _c: &mut Compiler<
     parser.set_function(old_func);
     new_func.set_n_args(n_vars);
     
-    return Some(new_func);    
+    Some(new_func)
 }
 
 

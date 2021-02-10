@@ -11,9 +11,9 @@ fn print(vm: &mut VM, n_args: u8)->u8{
     for arg in args{        
         print!("{} ",arg.unwrap().to_string());
     }
-    println!("");
+    println!();
 
-    return 0;
+    0
 }
 
 pub fn register_io_package(packages: &mut Packages, elements : &mut Vec<Function>){

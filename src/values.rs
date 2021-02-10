@@ -84,10 +84,7 @@ impl Value {
     
 
     pub fn is_nil(&self)-> bool {
-        match self {
-            Value::Nil => true,
-            _ => false
-        }
+        matches!(self, Value::Nil)        
     }
 
     
@@ -128,8 +125,8 @@ impl ValueTrait for Value  {
             Value::Nil=>Nil.type_name(),
             Value::Number(v)=>v.type_name(),
             Value::Bool(v)=>v.type_name(),
-            Value::HeapRef(_)=>format!("HeapReference"),
-            Value::PackageRef(_)=>format!("PackageReference"),
+            Value::HeapRef(_)=>"HeapReference".to_string(),
+            Value::PackageRef(_)=>"PackageReference".to_string(),
             
             
         })

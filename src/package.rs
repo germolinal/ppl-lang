@@ -16,7 +16,7 @@ pub type Packages = HashMap<String,Package>;
 impl Package {
     pub fn new(name: String)->Self{
         Self {
-            name: name.clone(),
+            name,
             functions: HashMap::new()
         }
     }
@@ -35,7 +35,7 @@ impl Package {
     pub fn register_func(&mut self, func: Function, elements: &mut Vec<Function> )->Result<(),String> {
         
         // Get the name
-        let func_name = format!("{}",func.get_name());
+        let func_name = func.get_name().to_string();
         let f_name_2 = func_name.clone();
 
         // Push it
@@ -50,7 +50,7 @@ impl Package {
         
     }
 
-    pub fn get(&self, func_name: &String)->Option<&i16>{
+    pub fn get(&self, func_name: &str)->Option<&i16>{
         self.functions.get(func_name)
     }
 }

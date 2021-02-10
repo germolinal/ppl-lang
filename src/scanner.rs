@@ -8,7 +8,7 @@ pub struct Scanner<'a> {
         
     line : usize,    
 
-    source: &'a Vec<u8>,
+    source: &'a [u8],
 
     current_index: usize,
 
@@ -21,13 +21,13 @@ pub struct Scanner<'a> {
 
 impl <'a>Scanner<'a> {
     
-    pub fn new(source : &'a Vec<u8>)->Self{
+    pub fn new(source : &'a [u8])->Self{
         Self {
+            finished: source.is_empty(),
+            source,
             line: 1,                        
-            source: source,
             current_index: 0,
             start_index: 0,
-            finished: source.len() == 0,
             error_msg : "".to_string(),
         }
     }
@@ -36,18 +36,18 @@ impl <'a>Scanner<'a> {
         
         let txt = &self.source[self.start_index()..self.current_index()];        
         Token {
+            token_type,            
+            txt,
             line: self.line(),
             length: self.current_index() - self.start_index(),
-            txt: txt,
             start: self.start_index(),
-            token_type: token_type            
         }
     }
 
     pub fn make_token_with_line(&self, token_type: TokenType, line: usize)->Token<'a>{
         let mut ret = self.make_token(token_type);
         ret.line = line;
-        return ret;
+        ret
     }
 
     pub fn error_msg(&self)->String{
@@ -55,7 +55,7 @@ impl <'a>Scanner<'a> {
         self.error_msg.clone()
     }
 
-    pub fn source(&self)->&Vec<u8>{
+    pub fn source(&self)->&[u8]{
         self.source
     }
 
@@ -82,7 +82,8 @@ impl <'a>Scanner<'a> {
         }
 
         self.current_index += 1;//self.current.add(1);
-        return true;
+        
+        true
                 
     }
 
@@ -95,7 +96,7 @@ impl <'a>Scanner<'a> {
                 if self.current_index == self.source().len(){
                     self.finished = true;
                 }
-                return Some(*v as char)
+                Some(*v as char)
             },
             None => {
                 self.finished = true;
@@ -104,6 +105,7 @@ impl <'a>Scanner<'a> {
         }
         
     }
+
 
     
     /*
@@ -125,8 +127,7 @@ impl <'a>Scanner<'a> {
             return '\0';
         }
         
-        return self.source[self.current_index+1] as char;// .clone().add(1) as char;
-        
+        self.source[self.current_index+1] as char // .clone().add(1) as char;        
     }
 
     fn skip_white_space(&mut self){
@@ -171,19 +172,15 @@ impl <'a>Scanner<'a> {
                                 break; // get out of the block comment loop                                
                                 
                             }
-                            match self.advance().unwrap(){
-                                '\n' => {
-                                    self.line += 1;
-                                    //self.advance().unwrap();
-                                },
-                                _ =>{}
-                            };
+                            if let '\n' = self.advance().unwrap(){
+                                self.line += 1;                                 
+                            }
                         }
                     }else{
                         return;
                     }
                 }
-                _ => return ()
+                _ => return 
             };
             
         }
@@ -211,8 +208,9 @@ impl <'a>Scanner<'a> {
         }
         
 
-        return self.make_token_with_line(TokenType::TokenString, start_line);
+        self.make_token_with_line(TokenType::TokenString, start_line)
     }
+
 
     fn number(&mut self)->Token<'a>{        
         
@@ -347,11 +345,13 @@ impl <'a>Scanner<'a> {
         // If not a keyword,        
         if self.peek() == ':' && self.peek_next()==':'{
             let ret = self.make_token(TokenType::Package);
-            self.advance();self.advance();            
-            return ret;                        
-        }else{
+            self.advance();
+            self.advance();            
 
-            return self.make_token(TokenType::Identifier);                        
+            ret                      
+
+        }else{
+            self.make_token(TokenType::Identifier)
         }
         
     }
@@ -378,7 +378,7 @@ impl <'a>Scanner<'a> {
             i+=1;
         }
         
-        return true
+        true
     }
 
     pub fn scan_token(&mut self) -> Token<'a> {
@@ -457,10 +457,10 @@ impl <'a>Scanner<'a> {
             },
 
             // String
-            '"' => {return self.string();},
+            '"' => {self.string()},
 
             '\0' =>{
-                return self.make_token(TokenType::EOF)
+                self.make_token(TokenType::EOF)
             },
 
 
@@ -483,7 +483,7 @@ impl <'a>Scanner<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::debug::*;
+    use crate::debug;
 
     #[test]
     fn test_scanner_advance(){

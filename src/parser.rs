@@ -1,5 +1,4 @@
 
-use crate::debug::*;
 use crate::scanner::*;
 use crate::token::*;
 use crate::parse_function::*;
@@ -9,7 +8,8 @@ use crate::compiler::Compiler;
 use crate::heap_list::HeapList;
 use crate::package::{/*Package,*/ Packages};
 
-
+#[cfg(debug_assertions)]
+use crate::debug;
 
 
 #[repr(u8)] 
@@ -52,7 +52,7 @@ pub struct Parser<'a>{
 
 impl <'a>Parser<'a>{
 
-    pub fn new(source: &'a Vec<u8>)->Self{
+    pub fn new(source: &'a [u8])->Self{
         let scanner = Scanner::new(source);
         let previous = scanner.make_token(TokenType::EOF);
         let current = scanner.make_token(TokenType::EOF);
@@ -60,11 +60,11 @@ impl <'a>Parser<'a>{
         let main_function = Function::new_script("main".as_bytes());
         
         Self {
-            scanner: scanner,
+            scanner,
+            current,
+            previous,            
             had_error: false,
             panic_mode: false,
-            current: current,
-            previous: previous,            
             current_function : Some(main_function),                  
         }
     }
@@ -127,15 +127,9 @@ impl <'a>Parser<'a>{
         self.previous = self.current;        
         self.current = self.scanner.scan_token();
 
-        loop{
-            match self.current.token_type(){
-                TokenType::Error => {
-                    let msg = self.scanner.error_msg();
-                    self.error_at_current(msg);
-                    break;
-                },
-                _ => break
-            }
+        if let TokenType::Error = self.current.token_type(){
+            let msg = self.scanner.error_msg();
+            self.error_at_current(msg);
         }
     }
 
@@ -384,7 +378,7 @@ impl <'a>Parser<'a>{
         let rule = match self.get_rule(self.previous.token_type()).prefix {
             Some(r) => r,
             None => {
-                self.error_at_current(format!("Expecting expression.")); 
+                self.error_at_current("Expecting expression.".to_string()); 
                 return;
             }
         };
@@ -398,7 +392,7 @@ impl <'a>Parser<'a>{
             self.advance();
             match self.get_rule(self.previous.token_type()).infix{
                 Some(r)=>r(can_assign, self, compiler, heap, packages_dictionary, packages_elements),
-                None => self.internal_error_at_current(format!("No infix rule!"))
+                None => self.internal_error_at_current("No infix rule!".to_string())
             }
         }                
     }
@@ -424,16 +418,16 @@ impl <'a>Parser<'a>{
                 match &self.current_function{
                     Some(f)=>{
                         let ch = f.chunk().unwrap();
-                        debug::chunk(ch, format!("main"));
+                        debug::chunk(ch, "main".to_string());
                     },
                     None=> println!("No Main Chunk to debug")
                 }
                 
             }
-            return None;
+            None
         }else{
             self.emit_byte(Operation::Return);
-            return self.take_current_function();
+            self.take_current_function()
         }
     }
 
@@ -590,7 +584,7 @@ impl <'a>Parser<'a>{
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
-            return self.error_at_current(format!("Expecting '{{' when opening For loop."));
+            return self.error_at_current("Expecting '{' when opening For loop.".to_string());
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
@@ -639,7 +633,7 @@ impl <'a>Parser<'a>{
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
-            return self.error_at_current(format!("Expecting '{{' when opening For loop."));
+            return self.error_at_current( "Expecting '{{' when opening For loop.".to_string() );
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
@@ -678,7 +672,7 @@ impl <'a>Parser<'a>{
                 self.end_scope(compiler);
                 
             } else{
-                return self.error_at_current(format!("Expecting 'if' or '{{' after 'else' keyword"));
+                return self.error_at_current( "Expecting 'if' or '{{' after 'else' keyword".to_string() );
             }
 
             // Mark the end
@@ -715,7 +709,7 @@ impl <'a>Parser<'a>{
         
         // consume 'in', or fail
         if !self.consume(TokenType::In) {
-            return self.error_at_current(format!("Expecting keyword 'in' when declaring For loop."));
+            return self.error_at_current( "Expecting keyword 'in' when declaring For loop.".to_string() );
         }
         
         
@@ -733,7 +727,7 @@ impl <'a>Parser<'a>{
 
         // consume Left Brace
         if !self.consume(TokenType::LeftBrace){
-            return self.error_at_current(format!("Expecting '{{' when opening For loop."));
+            return self.error_at_current( "Expecting '{{' when opening For loop.".to_string() );
         }
         // Open, process, and close the scope for the body        
         self.begin_scope(compiler);
@@ -788,7 +782,7 @@ impl <'a>Parser<'a>{
                 self.while_statement(compiler, heap, packages_dictionary, packages_elements);
             },
             TokenType::EOF=>{
-                return
+                
             },
             _ => {
                 // Expression-statement
@@ -839,7 +833,7 @@ impl <'a>Parser<'a>{
         }
         
         if !self.consume(TokenType::RightBrace){
-            return self.error_at_current(format!("Expecting '}}' after block."));            
+            return self.error_at_current("Expecting '}' after block.".to_string() );            
         }
         
     }
@@ -854,7 +848,7 @@ impl <'a>Parser<'a>{
     /* ERROR FUNCTIONS */
 
     pub fn error_no_current_function(&mut self){
-        self.error_at_current(format!("Trying to use Parser's current function... found None"))
+        self.error_at_current( "Trying to use Parser's current function... found None".to_string() )
     }
 
     pub fn error_at_current(&mut self, msg: String){
@@ -1037,6 +1031,7 @@ mod tests {
     use crate::values::*;
     use crate::call_frame::CallFrame;
     use std::collections::HashMap;
+    use crate::debug;
 
     #[test]
     fn test_expression(){

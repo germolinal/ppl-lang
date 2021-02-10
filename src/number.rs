@@ -9,11 +9,11 @@ pub type Number = f64;
 impl ValueTrait for Number {
     
     fn to_string(&self) -> String {
-        return format!("{}",self);
+        format!("{}",self)
     }
 
     fn type_name(&self)->String{
-        return format!("Number")
+        "Number".to_string()
     }
 
     fn clone_to_value(&self)->Value{
@@ -69,7 +69,7 @@ impl ValueTrait for Number {
     fn compare_equal(&self, other: &Value)->Result<Value,String>{
         match other {
             Value::Number(v) => {
-                Ok(Value::Bool(self == v))                
+                Ok(Value::Bool( (self - v).abs() < f64::EPSILON ) )               
             },
             _ => Err(format!("Comparing '{}' with '{}'", self.type_name(), other.type_name()))
         }

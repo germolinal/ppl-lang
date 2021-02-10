@@ -21,8 +21,8 @@ impl CallFrame{
         
     pub fn new(first_slot: u8, function: Function)->Self{        
         Self{
-            function: function,
-            first_slot: first_slot,
+            function,
+            first_slot,
             ip_index: 0,            
         }
     }

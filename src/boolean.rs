@@ -11,7 +11,7 @@ impl ValueTrait for Boolean {
     }
 
     fn type_name(&self)->String{
-        format!("Boolean")
+        "Boolean".to_string()
     }
 
     fn as_any(&self) -> &dyn Any{

@@ -14,7 +14,7 @@ impl NativeFn {
         
         NativeFn {
             name: std::str::from_utf8(name).unwrap().to_string(),
-            func: func
+            func
         }     
     }
 }

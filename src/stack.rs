@@ -56,7 +56,7 @@ impl <T>Stack<T>{
     ///#[inline]
     pub fn drop_last(&mut self)->Result<(),String>{
         if self.len == 0 {
-            Err(format!("Trying to drop last element of an empty stack"))
+            Err("Trying to drop last element of an empty stack".to_string())
         }else{            
             self.len -= 1;                            
             Ok(())
@@ -69,7 +69,7 @@ impl <T>Stack<T>{
     ///#[inline]
     pub fn drop_n(&mut self, n : u8)->Result<(),String>{
         if self.len == 0 {
-            Err(format!("Trying to drop last element of an empty stack"))
+            Err( "Trying to drop last element of an empty stack".to_string() )
         }else{            
             self.len -= n;                            
             Ok(())
@@ -82,7 +82,7 @@ impl <T>Stack<T>{
     pub fn push(&mut self, value: T) -> Result<(),String>{
         // Check if it is full
         if self.len == self.elements.len() as u8 {
-            return Err(format!("Stack Overflow!"));
+            return Err( "Stack Overflow!".to_string() );
         }
 
         unsafe {

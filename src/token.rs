@@ -62,9 +62,9 @@ impl <'a>PartialEq for Token<'a> {
                     return false;
                 }
             }
-            return true;
+            true
         }else{
-            return false;
+            false
         }
     }
 }

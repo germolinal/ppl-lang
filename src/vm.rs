@@ -8,7 +8,7 @@ use crate::heap_list::HeapList;
 use crate::stack::Stack;
 
 #[cfg(debug_assertions)]
-use crate::debug::*;
+use crate::debug;
 
 pub enum InterpretResult {
     Ok(usize),    
@@ -34,17 +34,7 @@ impl VM {
 
     }    
 
-    /*
-    pub fn interpret(&mut self, _source : &Vec<Operation>) -> InterpretResult {
-        
-        //compile(source);        
-        return InterpretResult::Ok;
-    }
     
-    fn define_specific_var(&mut self, var_index: usize, v: Value){
-        self.var_stack[var_index] = v;        
-    }
-    */
     
     fn for_loop(&mut self)->Result<(),String>{
         unimplemented!();
@@ -101,40 +91,35 @@ impl VM {
         */                          
     }
 
+    #[inline]
     fn jump_if_false(&mut self, n: u8, frame_n: &u8)->Result<(),String>{
         if let Value::Bool(v) = self.stack.last() {
             if !(*v) {                            
                 self.call_frames[*frame_n].jump_forward(n as usize);
             }
-            return Ok(())
+            Ok(())
         }else{
             let value = self.pop().unwrap();
-            return Err(format!("Expression in 'if' statement (i.e., if EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
+            Err(format!("Expression in 'if' statement (i.e., if EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()))
         }
     }
 
+    #[inline]
     fn jump_if_true(&mut self, n: u8, frame_n: &u8)->Result<(),String>{
         if let Value::Bool(v) = self.stack.last() {
             if *v {                            
                 self.call_frames[*frame_n].jump_forward(n as usize);
             }
-            return Ok(())
+            Ok(())
         }else{
             let value = self.pop().unwrap();
-            return Err(format!("Expression in 'if' statement (i.e., if EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()));
+            Err(format!("Expression in 'if' statement (i.e., if EXPR {{...}} ) must be a boolean... found a '{}'", value.type_name()))
         }
     }
 
+    #[inline]
     fn pop_n(&mut self, n: u8)->Result<(),String>{
-        self.stack.drop_n(n)
-        /*
-        for _ in 0..n {
-            if let Err(e) = self.pop(){
-                return Err(format!("{}",e))
-            }
-        }
-        Ok(())
-        */
+        self.stack.drop_n(n)        
     }
 
     fn define_vars(&mut self, n: u8)->Result<(),String>{
@@ -151,7 +136,7 @@ impl VM {
                     }
                     */
                 },
-                Err(e)=>return Err(format!("{}", e))
+                Err(e)=> {return Err(e.to_string());}
             }
         }
         Ok(())
@@ -163,11 +148,11 @@ impl VM {
             Ok(v) => match v.negate(){
                 Ok(v)=>{
                     self.push(v);
-                    return Ok(());
+                    Ok(())
                 },
-                Err(e)=>return Err(e)
+                Err(e)=> Err(e)
             },
-            Err(e)=>return Err(format!("{}", e))
+            Err(e)=> Err(e.to_string())
         }   
     }
 
@@ -177,11 +162,11 @@ impl VM {
             Ok(v) => match v.not(){
                 Ok(v)=>{
                     self.push(v);
-                    return Ok(())
+                    Ok(())
                 },
-                Err(e)=>return Err(e)
+                Err(e)=> Err(e)
             },
-            Err(e)=>return Err(format!("{}", e))
+            Err(e)=> Err(e.to_string())
         }  
     }
 
@@ -192,9 +177,9 @@ impl VM {
         match a.add(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=>Err(e)
         }  
     }
 
@@ -205,9 +190,9 @@ impl VM {
         match a.subtract(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }      
     }
 
@@ -218,9 +203,9 @@ impl VM {
         match a.multiply(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }   
     }
 
@@ -231,9 +216,9 @@ impl VM {
         match a.divide(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }       
     }
 
@@ -245,9 +230,9 @@ impl VM {
         match a.compare_equal(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }      
     }
 
@@ -258,9 +243,9 @@ impl VM {
         match a.compare_not_equal(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }       
     }
 
@@ -271,9 +256,9 @@ impl VM {
         match a.greater(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }   
     }
 
@@ -284,9 +269,9 @@ impl VM {
         match a.less(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }    
     }
 
@@ -297,9 +282,9 @@ impl VM {
         match a.greater_equal(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }
     }
 
@@ -310,13 +295,13 @@ impl VM {
         match a.less_equal(&b){
             Ok(v)=>{
                 self.push(v);
-                return Ok(())
+                Ok(())
             },
-            Err(e)=>return Err(e)
+            Err(e)=> Err(e)
         }   
     }
 
-    #[inline]
+    
     fn and(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -324,7 +309,7 @@ impl VM {
             Value::Bool(v)=>{
                 if !v { // If not A then A and B can't be true
                     self.push(Value::Bool(false));
-                    return Ok(())
+                    Ok(())
                 }else{
                     // If A, then check B
                     match b {
@@ -334,17 +319,17 @@ impl VM {
                             }else{
                                 self.push(Value::Bool(false));                                
                             }
-                            return Ok(())
+                            Ok(())
                         },
-                        _ =>return Err(format!("Cannot use 'and' operator because expression at the right of 'and' is not a Boolean"))
+                        _ => Err( "Cannot use 'and' operator because expression at the right of 'and' is not a Boolean".to_string() )
                     }
                 }
             },
-            _ => return Err(format!("Cannot use 'and' operator because expression at the left of 'and' is not a Boolean"))
+            _ => Err( "Cannot use 'and' operator because expression at the left of 'and' is not a Boolean".to_string() )
         }
     }
 
-    #[inline]
+    
     fn or(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
@@ -352,7 +337,7 @@ impl VM {
             Value::Bool(v)=>{
                 if v { // If A then A or B must be true
                     self.push(Value::Bool(true));
-                    return Ok(())
+                    Ok(())
                 }else{
                     // If not A, then check B
                     match b {
@@ -363,13 +348,13 @@ impl VM {
                             }else{
                                 self.push(Value::Bool(false));
                             }
-                            return Ok(())
+                            Ok(())
                         },
-                        _ =>return Err(format!("Cannot use 'or' operator because expression at the right of 'or' is not a Boolean"))
+                        _ =>Err( "Cannot use 'or' operator because expression at the right of 'or' is not a Boolean".to_string() )
                     }
                 }
             },
-            _ => return Err(format!("Cannot use 'or' operator because expression at the left of 'or' is not a Boolean"))
+            _ => Err( "Cannot use 'or' operator because expression at the left of 'or' is not a Boolean".to_string() )
         }
     }
 
@@ -402,7 +387,7 @@ impl VM {
         let local = self.stack[absolute_position];
         // Check if it has been initialized
         if local.is_nil() {
-            return Err(format!("Trying to use an uninitialized (i.e. Nil) variable"));
+            return Err( "Trying to use an uninitialized (i.e. Nil) variable".to_string());
         }
         // Let the HEAP know that we are referencing this
         if let Value::HeapRef(i) = local {
@@ -429,7 +414,7 @@ impl VM {
         // we don't allow that.                    
         if let Value::HeapRef(heap_ref) = self.stack[last]{
             if heap.get(heap_ref).unwrap().is_function(){
-                return Err(format!("Cannot assign a function into a variable"));
+                return Err("Cannot assign a function into a variable".to_string());
             }
         }
 
@@ -439,9 +424,10 @@ impl VM {
     }
 
     /// Gets a global variable
+    #[inline]
     fn get_global(&mut self, i: u8, heap: &mut HeapList)->Result<(),String>{
         if !heap.get(i).unwrap().is_function(){
-            return Err(format!("Trying to get a reference to a non-function global variable"))
+            return Err( "Trying to get a reference to a non-function global variable".to_string() )
         }
         heap.add_reference(i);
         self.push(Value::HeapRef(i));
@@ -449,13 +435,14 @@ impl VM {
     }
 
     /// Gets a value from package
+    #[inline]
     fn get_from_package(&mut self, i: i16)->Result<(),String>{
         self.push(Value::PackageRef(i));
         Ok(())
     }
 
     /// Calls a function
-    fn call(&mut self, n_vars: u8, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
+    fn call(&mut self, n_vars: u8, heap: &mut HeapList, packages_elements: &[Function], frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
         let f_ref = self.stack[ self.stack.len() as u8 - n_vars - 1 ];
 
         match f_ref {
@@ -540,7 +527,7 @@ impl VM {
         
         // Go back one call_frame
         if let Err(msg) = self.drop_call_frame(){
-            return Err(msg.to_string());
+            return Err( msg );
         }          
 
         *frame_n -= 1;
@@ -552,7 +539,7 @@ impl VM {
     }
 
     /// Grabs an operation and performs the appropriate action
-    fn perform_operation(&mut self, current_operation: Operation, heap: &mut HeapList, packages_elements: &Vec<Function>, frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
+    fn perform_operation(&mut self, current_operation: Operation, heap: &mut HeapList, packages_elements: &[Function], frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
         match current_operation {
             Operation::Return => {                                       
                 unreachable!();                
@@ -668,7 +655,7 @@ impl VM {
 
 
     /// Runs the last CallFrame in the call_stack
-    pub fn run( &mut self, heap: &mut HeapList, packages_elements: &Vec<Function> ) -> InterpretResult {
+    pub fn run( &mut self, heap: &mut HeapList, packages_elements: &[Function] ) -> InterpretResult {
                         
         let mut frame_n = self.call_frames.len() - 1;
         
@@ -702,7 +689,7 @@ impl VM {
                     let v = self.stack[val];
                     print!("{}, ", v.to_string());                    
                 }
-                print!("]\n");
+                println!("]");
 
                 // Report operation                 
                 let code_lines = self.call_frames[frame_n].code_lines().unwrap();               
@@ -749,7 +736,7 @@ impl VM {
         let current_function = self.call_frames[frame_n].function();
         let f_name = current_function.get_name();
 
-        return InterpretResult::RuntimeError(format!("No RETURN operation found in function '{}' (this is a bug, not a user error)", f_name));
+        InterpretResult::RuntimeError(format!("No RETURN operation found in function '{}' (this is a bug, not a user error)", f_name))
         
     }
     

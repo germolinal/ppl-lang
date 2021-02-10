@@ -42,6 +42,11 @@ impl HeapList {
         self.n_elements
     }
 
+    /// Checks if len() is zero
+    pub fn is_empty(&self)->bool{
+        self.n_elements == 0
+    }
+
     /// Borrows an element from the HeapList
     pub fn get(&self, i: u8)->Option<&Box<dyn ValueTrait>>{
         if self.elements.len() > i as usize {
@@ -63,12 +68,12 @@ impl HeapList {
             };
 
             self.elements[i as usize] = Some(Element {
-                value: value,
+                value,
                 n_refs: old_refs,
             });
             Ok(())
         }else{
-            return Err(format!("Element out of bounds in HeapList. Setting element {} but there are only {}", i, self.elements.len()))            
+            Err(format!("Element out of bounds in HeapList. Setting element {} but there are only {}", i, self.elements.len()))           
             
         }
     }
@@ -115,7 +120,7 @@ impl HeapList {
     pub fn push(&mut self, v: Box<dyn ValueTrait>) -> u8 {        
                 
         // Check if the heap is full
-        if self.n_elements >= u8::MAX {
+        if self.n_elements == u8::MAX {
             panic!("The max number of elements in the heap of a Chunk ({}) has been exceeded", self.elements.len());
         }
 
@@ -145,7 +150,7 @@ impl HeapList {
             }
         }
 
-        return ret;
+        ret
 
     }
 

@@ -26,13 +26,13 @@ pub struct Compiler<'a> {
 }
 
 
-pub fn compile<'a>(source: &'a Vec<u8>, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>) -> Option<Function> {            
+pub fn compile<'a>(source: &'a [u8], heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>) -> Option<Function> {            
     let compiler_options : Options<CompilerOptions> = vec![];
 
     let mut compiler = Compiler::new(compiler_options);
     let mut parser = Parser::new(source);
 
-    return parser.program(&mut compiler, heap, packages_dictionary, packages_elements);
+    parser.program(&mut compiler, heap, packages_dictionary, packages_elements)
 
 }
 
@@ -79,7 +79,7 @@ impl <'a>Compiler<'a> {
             
         let var_slice = var.source_slice();
 
-        if self.locals.len() == 0 {            
+        if self.locals.is_empty() {            
             return false;
         }
 
@@ -93,14 +93,12 @@ impl <'a>Compiler<'a> {
             //}
 
             // if not the same length, don't bother
-            if local.name.length == var.length {                
-                if var_slice == local.name.source_slice(){                    
-                    return true
-                }
+            if local.name.length == var.length && var_slice == local.name.source_slice(){                                
+                return true                
             }
         }
 
-        return false;
+        false
     }
 
     /// Retrieves the position of a local variable in the scope    
@@ -108,7 +106,7 @@ impl <'a>Compiler<'a> {
             
         let var_slice = var.source_slice();
 
-        if self.locals.len() == 0 {
+        if self.locals.is_empty() {
             return None;
         }
 
@@ -116,14 +114,13 @@ impl <'a>Compiler<'a> {
             let local = &self.locals[i];
                                     
             // if not the same length, don't bother
-            if local.name.length == var.length {
-                if var_slice == local.name.source_slice(){
-                    return Some(i as u8)
-                }
+            if local.name.length == var.length && var_slice == local.name.source_slice() {                
+                return Some(i as u8)
+                
             }
         }
 
-        return None;
+        None
     }
 
     /// Pushes a Local into the locals vector in the 

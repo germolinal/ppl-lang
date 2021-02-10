@@ -14,11 +14,11 @@ impl Nil {
 
 impl ValueTrait for Nil {
     fn to_string(&self)->String{
-        return format!("Nil");
+        "Nil".to_string()
     }
 
     fn type_name(&self)->String{
-        return format!("Nil")
+        "Nil".to_string()
     }        
 
     fn as_any(&self) -> &dyn Any{

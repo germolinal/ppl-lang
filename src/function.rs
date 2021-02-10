@@ -96,7 +96,7 @@ impl ValueTrait for Function {
     }
 
     fn type_name(&self)->String{
-        format!("Function")
+        "Function".to_string()
     }
 
     fn is_function(&self)->bool{
@@ -122,7 +122,7 @@ impl ValueTrait for Function {
                 if n_args != f.n_args {
                     return Err(format!("Incorrect number of arguments. Found {}, required {}", n_args, f.n_args));
                 }
-                return Ok(1);                
+                Ok(1)                
             },
             Function::Native(f)=>{
                 // Get the function
