@@ -55,6 +55,7 @@ impl CallFrame{
         }
     }
 
+    /*
     /// Gets the current Operation and line of that operation
     pub fn current_instruction_and_line(&self)->Result<(Operation,usize), String>{
         if self.function.is_native() {
@@ -63,6 +64,18 @@ impl CallFrame{
             let ops_lines =self.function.chunk().unwrap().as_slice();
             let i = self.ip_index;
             Ok(ops_lines[i])            
+        }
+    }
+    */
+
+    /// Gets the current Operation and line of that operation
+    pub fn current_instruction(&self)->Result<Operation, String>{
+        if self.function.is_native() {
+            return Err(format!("Trying to get Operation from function '{}' which is native", self.function.get_name()));
+        }else{
+            let ops_lines =self.function.chunk().unwrap().as_slice();
+            let i = self.ip_index;
+            Ok(ops_lines[i].0)            
         }
     }
 

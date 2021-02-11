@@ -540,7 +540,7 @@ impl VM {
 
     /// Grabs an operation and performs the appropriate action
     fn perform_operation(&mut self, /*current_operation: Operation,*/ heap: &mut HeapList, packages_elements: &[Function], frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
-        let (current_operation, _)=self.call_frames[*frame_n].current_instruction_and_line().unwrap();            
+        let current_operation =self.call_frames[*frame_n].current_instruction().unwrap();            
 
         match current_operation {
             Operation::Return => {                                       
@@ -705,7 +705,7 @@ impl VM {
             /*****************************/
             /*****************************/
 
-            let (current_operation, _)=self.call_frames[frame_n].current_instruction_and_line().unwrap();            
+            let current_operation = self.call_frames[frame_n].current_instruction().unwrap();            
             
             if let Operation::Return = current_operation {
                 /* IF THIS SI THE RETURN FROM A FUNCTION */
