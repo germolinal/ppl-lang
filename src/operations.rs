@@ -29,7 +29,7 @@ pub enum Operation {
     GetLocal(u8),
     SetLocal(u8),
     GetGlobal(u8),
-    GetFromPackage(i16),
+    GetFromPackage(usize),
 
     Pop(u8),
     DefineVars(u8),

@@ -7,7 +7,7 @@ use crate::native_fn::{NativeFn, NativeFnType};
 /// A structure that indexes the position of functions
 /// in the Package in the package_elements vector
 pub struct Package {
-    functions: HashMap<String,i16>,
+    functions: HashMap<String,usize>,
     pub name: String
 }
 
@@ -39,7 +39,7 @@ impl Package {
         let f_name_2 = func_name.clone();
 
         // Push it
-        let index = elements.len() as i16;
+        let index = elements.len();
         elements.push(func);
 
         // register it
@@ -50,7 +50,7 @@ impl Package {
         
     }
 
-    pub fn get(&self, func_name: &str)->Option<&i16>{
+    pub fn get(&self, func_name: &str)->Option<&usize>{
         self.functions.get(func_name)
     }
 }
