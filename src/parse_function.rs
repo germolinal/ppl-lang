@@ -6,6 +6,7 @@ use crate::operations::*;
 use crate::function::Function;
 use crate::compiler::Compiler;
 use crate::package::Packages;
+use crate::string::StringV;
 
 /* PARSING FUNCTIONS */
 
@@ -35,12 +36,13 @@ pub fn unary<'a>(_can_assign: bool, parser: &mut Parser<'a>, compiler: &mut Comp
     };
 }
 
-pub fn string(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
-    /*
-    let v = parser.previous().source_text();                
-    parser.emit_byte(Operation::PushString(Box::new(v)));
-    */
-    unimplemented!();
+pub fn string(_can_assign: bool, parser: &mut Parser, _c: &mut Compiler, heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){
+    let s : StringV = parser.previous().source_text().to_string();
+    let v = Box::new(s);
+    let i = heap.push(v);                
+    
+    parser.emit_byte(Operation::PushHeapRef(i));
+    
 }
 
 pub fn array(_can_assign: bool, _parser: &mut Parser, _c: &mut Compiler, _heap: &mut HeapList, _packages_dictionary: &mut Packages, _packages_elements: &mut Vec<Function>){

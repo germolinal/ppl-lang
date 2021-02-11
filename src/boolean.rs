@@ -18,9 +18,7 @@ impl ValueTrait for Boolean {
         self
     }
 
-    fn clone_to_value(&self)->Value{
-        Value::Bool(*self)
-    }
+    
     
     fn not(&self)->Result<Value,String>{
         Ok(Value::Bool(!self))

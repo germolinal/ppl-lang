@@ -35,6 +35,22 @@ pub enum Value {
 
 impl Value {
 
+    /*
+    fn clone_to_value(&self)-> Value {
+        match self{
+            Value::Nil=>Value(&Nil),
+            Value::Number(v)=>ValueTrait::clone_to_value(v),
+            Value::Bool(v)=>ValueTrait::clone_to_value(v),            
+            Value::HeapRef(i)=>{
+                Value::HeapRef(*i)
+            },       
+            Value::PackageRef(i)=>{
+                Value::PackageRef(*i)
+            },                                  
+        }
+    }
+    */
+
     pub fn get_number(&self)->Option<Number>{
         match self {
             Value::Number(v)=>Some(*v),
@@ -141,22 +157,6 @@ impl ValueTrait for Value  {
             Value::PackageRef(i)=>format!("PackageRef<{}>", i),                                  
         }
     }
-
-    
-    fn clone_to_value(&self)-> Value {
-        match self{
-            Value::Nil=>ValueTrait::clone_to_value(&Nil),
-            Value::Number(v)=>ValueTrait::clone_to_value(v),
-            Value::Bool(v)=>ValueTrait::clone_to_value(v),            
-            Value::HeapRef(i)=>{
-                Value::HeapRef(*i)
-            },       
-            Value::PackageRef(i)=>{
-                Value::PackageRef(*i)
-            },                                  
-        }
-    }
-    
     
     fn as_any(&self) -> &dyn Any{
         self

@@ -15,11 +15,6 @@ impl ValueTrait for Number {
     fn type_name(&self)->String{
         "Number".to_string()
     }
-
-    fn clone_to_value(&self)->Value{
-        Value::Number(*self)
-    }
-
     
     fn as_any(&self) -> &dyn Any{
         self

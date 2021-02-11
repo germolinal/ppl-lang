@@ -1,0 +1,5 @@
+let a 
+
+io::print(a, 23, "aUto")
+
+ 

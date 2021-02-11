@@ -14,7 +14,7 @@ impl Nil {
 
 impl ValueTrait for Nil {
     fn to_string(&self)->String{
-        "Nil".to_string()
+        "nil".to_string()
     }
 
     fn type_name(&self)->String{
@@ -24,11 +24,7 @@ impl ValueTrait for Nil {
     fn as_any(&self) -> &dyn Any{
         self
     } 
-
-    fn clone_to_value(&self)->Value{
-        Value::Nil        
-    }
-
+    
 }
 
 

@@ -6,6 +6,7 @@ mod value_trait;
 mod nil;
 mod number;
 mod boolean;
+mod string;
 
 mod native_fn;
 mod script_fn;

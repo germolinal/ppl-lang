@@ -385,10 +385,8 @@ impl VM {
     /// Gets a local variable
     fn get_local(&mut self, absolute_position: u8, heap: &mut HeapList)->Result<(),String>{
         let local = self.stack[absolute_position];
-        // Check if it has been initialized
-        if local.is_nil() {
-            return Err( "Trying to use an uninitialized (i.e. Nil) variable".to_string());
-        }
+        
+        
         // Let the HEAP know that we are referencing this
         if let Value::HeapRef(i) = local {
             heap.add_reference(i);

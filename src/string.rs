@@ -1,6 +1,7 @@
+use std::any::Any;
 
 use crate::value_trait::ValueTrait;
-use crate::values::Value;
+
 
 pub type StringV = String;
 
@@ -14,9 +15,8 @@ impl ValueTrait for StringV {
         format!("{}",self)
     }
 
-    fn clone_to_value(&self)->Value{
-        Value::StringV(Box::new(
-            ValueTrait::to_string(self)
-        ))
+    fn as_any(&self) -> &dyn Any{
+        self
     }
+        
 }

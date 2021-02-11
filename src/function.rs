@@ -107,10 +107,7 @@ impl ValueTrait for Function {
         self
     }    
 
-    // Copy and clone
-    fn clone_to_value(&self)->Value{
-        panic!("Trying to clone a function.")
-    }
+    
 
     fn call(&self, vm: &mut VM, n_args: u8)->Result<u8,String> {
 

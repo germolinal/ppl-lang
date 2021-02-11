@@ -8,10 +8,7 @@ pub trait ValueTrait {
 
     fn type_name(&self)->String;
 
-    fn as_any(&self) -> &dyn Any;
-
-    // Copy and clone
-    fn clone_to_value(&self)->Value;
+    fn as_any(&self) -> &dyn Any;    
 
     fn call(&self, _h: &mut VM, _n: u8)->Result<u8,String>{
         Err(format!("Cannot Call type '{}'... it is not a Function", self.type_name()))
