@@ -914,8 +914,7 @@ mod tests {
     
     use crate::vm::VM;
     use crate::chunk::Chunk;
-    use crate::value_trait::ValueTrait;
-    use crate::heap_list::HeapList;
+    use crate::value_trait::ValueTrait;    
     
 
     // this is used in some calses below.
@@ -997,9 +996,7 @@ mod tests {
             TokenType::Number => {},
             _ => {panic!("Expecting Number, found {}", debug::token(parser.previous))}
         }
-        
-        let mut heap = HeapList::new();
-        
+                
         number(false, &mut parser, &mut handler, &mut compiler);        
         if let (Operation::PushNumber(found), _) = parser.chunk().unwrap().last().unwrap() {            
             assert_eq!(2.0,*found);            
@@ -1031,8 +1028,7 @@ mod tests {
     }
 
     use crate::values::*;
-    use crate::call_frame::CallFrame;
-    use std::collections::HashMap;
+    use crate::call_frame::CallFrame;    
     use crate::debug;
 
     #[test]

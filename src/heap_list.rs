@@ -102,6 +102,8 @@ impl HeapList {
         }
     }
 
+    
+
     /// Removes a reference to an element in the HeapList.
     /// 
     /// If the number of references becomes Zero, the element
@@ -110,11 +112,18 @@ impl HeapList {
         if self.elements.len() > i as usize {
             match &mut self.elements[i as usize]{
                 None => panic!("Trying to drop_reference() to 'None' element in HeapStack... element {}",i),
-                Some(e)=> {                    
+                Some(e)=> {      
+                    eprintln!("Dropping reference from object {} in the heap. It had {}", i, e.n_refs);
                     e.n_refs -= 1;
                     // If references to this object are now Zero, drop it
                     if e.n_refs == 0 {
-                        drop(self.elements[i as usize].take());
+                        eprintln!("    ...Dropping Object at index {} in the heap", i);
+
+                        // Recursively drop these references as well (e.g., when it is an 
+                        // array or an object)
+                        let element = self.elements[i as usize].take().unwrap();                        
+                        element.value.drop_references(self);
+                        drop(element);
                         self.n_elements -= 1;
                         // Take note that this is now free.
                         if i < self.first_free {

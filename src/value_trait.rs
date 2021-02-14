@@ -1,6 +1,8 @@
+use std::any::Any;
+
+use crate::heap_list::HeapList;
 use crate::values::Value;
 use crate::vm::VM;
-use std::any::Any;
 
 pub trait ValueTrait {
     // Basic i/o
@@ -22,7 +24,9 @@ pub trait ValueTrait {
     fn get_next(&self)->Option<(Value,Value)>{
         None
     }
-    
+
+    // Drop
+    fn drop_references(&self, _h: &mut HeapList);
 
     // Operators
     fn not(&self)->Result<Value,String>{

@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use crate::value_trait::ValueTrait;
+use crate::heap_list::HeapList;
 
 use crate::nil::Nil;
 use crate::number::Number;
@@ -142,9 +143,7 @@ impl ValueTrait for Value  {
             Value::Number(v)=>v.type_name(),
             Value::Bool(v)=>v.type_name(),
             Value::HeapRef(_)=>"HeapReference".to_string(),
-            Value::PackageRef(_)=>"PackageReference".to_string(),
-            
-            
+            Value::PackageRef(_)=>"PackageReference".to_string(),                        
         })
     }
 
@@ -160,6 +159,20 @@ impl ValueTrait for Value  {
     
     fn as_any(&self) -> &dyn Any{
         self
+    }
+
+    fn drop_references(&self, heap: &mut HeapList){
+        match self {
+            Value::Nil => ValueTrait::drop_references(&Nil::new(),heap),
+            Value::Number(v) => ValueTrait::drop_references(v, heap),
+            Value::Bool(v) => ValueTrait::drop_references(v, heap),
+            Value::HeapRef(i)=>{
+                heap.drop_reference(*i)
+            },
+            Value::PackageRef(_)=>{
+                panic!("Trying to drop references from PackageRef")
+            },
+        }
     }
     
 

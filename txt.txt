@@ -1,0 +1,41 @@
+  --> n_frames: 0
+ | Stack: []
+ | Heap: [(0,"aUto"); ]
+
+0000 (ln 1)	OP_PUSH_NIL
+  --> n_frames: 0
+ | Stack: [nil, ]
+ | Heap: [(0,"aUto"); ]
+
+0001 (ln 3)	OP_GET_FROM_PACKAGE | 0
+  --> n_frames: 0
+ | Stack: [nil, PackageRef<0>, ]
+ | Heap: [(0,"aUto"); ]
+
+0002 (ln 3)	OP_GET_LOCAL | 0
+  --> n_frames: 0
+ | Stack: [nil, PackageRef<0>, nil, ]
+ | Heap: [(0,"aUto"); ]
+
+0003 (ln 3)	OP_PUSH_NUMBER | '23'
+  --> n_frames: 0
+ | Stack: [nil, PackageRef<0>, nil, 23, ]
+ | Heap: [(0,"aUto"); ]
+
+0004 (ln 3)	OP_PUSH_HEAP_REF | slot '0'
+  --> n_frames: 0
+ | Stack: [nil, PackageRef<0>, nil, 23, HeapRef<0>, ]
+ | Heap: [(0,"aUto"); ]
+
+0005 (ln 3)	OP_CALL | 3 args
+  --> n_frames: 0
+ | Stack: [nil, nil, ]
+ | Heap: [(0,"aUto"); ]
+
+0006 (ln 3)	OP_POP | 1
+  --> n_frames: 0
+ | Stack: [nil, ]
+ | Heap: [(0,"aUto"); ]
+
+0007 (ln 5)	OP_RETURN
+        0.47 real         0.00 user         0.00 sys

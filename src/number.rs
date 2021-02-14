@@ -1,10 +1,10 @@
-use crate::value_trait::ValueTrait;
-use crate::values::Value;
 use std::any::Any;
 
+use crate::value_trait::ValueTrait;
+use crate::values::Value;
+use crate::heap_list::HeapList;
+
 pub type Number = f64;
-
-
 
 impl ValueTrait for Number {
     
@@ -18,6 +18,9 @@ impl ValueTrait for Number {
     
     fn as_any(&self) -> &dyn Any{
         self
+    }
+
+    fn drop_references(&self, _h: &mut HeapList){
     }
     
 

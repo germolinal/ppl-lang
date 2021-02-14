@@ -1,3 +1,5 @@
+use std::env;
+
 use crate::handler::PPLHandler;
 use crate::operations::*;
 use crate::values::*;
@@ -119,7 +121,7 @@ impl VM {
     }
 
     //#[inline]
-    fn pop_n(&mut self, n: u8)->Result<(),String>{
+    fn drop_n(&mut self, n: u8)->Result<(),String>{                    
         self.stack.drop_n(n)        
     }
 
@@ -364,7 +366,7 @@ impl VM {
     fn set_local(&mut self, absolute_position: u8)->Result<(),String>{
         let last = self.stack.len()-1;
                 
-        // If this value, which will be removed, pointed to 
+        // If the value that will be replaced pointed to 
         // the heap, let the heap know
         if let Value::HeapRef(heap_ref) = self.stack[absolute_position] {
             self.handler.heap.drop_reference(heap_ref);
@@ -379,7 +381,7 @@ impl VM {
         }
 
         // Replace
-        self.stack[absolute_position] = self.stack[last];//self.pop().unwrap();                                                                                                                 
+        self.stack[absolute_position] = self.stack[last];
         Ok(())
     }
 
@@ -471,7 +473,7 @@ impl VM {
                     // At this stage, the stack should be
                     // [..., NativeFn<>, return_value] if something was returned, or
                     // simply [..., NativeFn<>] if nothing was returned
-
+                    
                     // Get the returned value (or nil, if there is no return)
                     let ret : Value;
                     if n_returns == 0 {
@@ -482,7 +484,8 @@ impl VM {
                         panic!("Function '{}' returns more than one argument... this is a bug in that function.", function.get_name())
                     }                        
                                                         
-                    // Pop the function itself
+                    // Pop the function itself... should not need
+                    // for dropping references
                     self.stack.drop_last().unwrap();
     
                     // Push result
@@ -573,7 +576,7 @@ impl VM {
                 self.get_from_package(i)
             },         
             Operation::Pop(n)=>{                    
-                self.pop_n(n)
+                self.drop_n(n)
             },
                         
             // Unary operations
@@ -679,16 +682,27 @@ impl VM {
             /********************************/
             
             #[cfg(debug_assertions)]
-            {
+            if env::var("TRACE_PPL_EXECUTION").is_ok(){
                 
-                // report stack
-                print!("  --> n_frames: {} | Stack: [", frame_n);
-                                            
+                // report stack_frame depth
+                eprintln!("  --> n_frames: {}", frame_n);
+
+                // Print the stack
+                eprint!(" | Stack: [");                                            
                 for val in 0..self.stack.len() {                    
                     let v = self.stack[val];
-                    print!("{}, ", v.to_string());                    
+                    eprint!("{}, ", v.to_string());                    
                 }
-                println!("]");
+                eprintln!("]");
+
+                // Print the heap
+                eprint!(" | Heap: [");                                            
+                for hi in 0..self.handler.heap.len(){
+                    if let Some(v) = self.handler.heap.get(hi){
+                        eprint!("({},{}); ", hi, v.to_string())
+                    }
+                }
+                eprintln!("]\n");
 
                 // Report operation                 
                 let code_lines = self.call_frames[frame_n].code_lines().unwrap();               

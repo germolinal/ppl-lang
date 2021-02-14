@@ -1,5 +1,7 @@
-use crate::value_trait::ValueTrait;
 use std::any::Any;
+
+use crate::value_trait::ValueTrait;
+use crate::heap_list::HeapList;
 
 
 pub struct Nil;
@@ -22,7 +24,10 @@ impl ValueTrait for Nil {
 
     fn as_any(&self) -> &dyn Any{
         self
-    } 
+    }
+
+    fn drop_references(&self, _h: &mut HeapList){
+    }
     
 }
 

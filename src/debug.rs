@@ -5,7 +5,7 @@ use crate::token::*;
 
 #[allow(dead_code)]
 fn simple_instruction(name: &str, _offset: usize) {
-    println!("{}",name);        
+    eprintln!("{}",name);        
 }
 
 
@@ -22,19 +22,19 @@ fn simple_instruction(name: &str, _offset: usize) {
 pub fn operation(ops: &[(Operation, usize)],offset: usize) {        
     //let ops = chunk.code();
     let (op, ln) = &ops[offset];                
-    print!("{:04} ", offset);    
+    eprint!("{:04} ", offset);    
     
     if *ln > 0 {
-        print!("(ln {})\t", ln)
+        eprint!("(ln {})\t", ln)
     }else {
-        print!("\t/\t")
+       eprint!("\t/\t")
     }
     
 
     match op {
         
         Operation::Return=> {
-            println!("OP_RETURN");
+            eprintln!("OP_RETURN");
         },            
 
         Operation::Negate => {
@@ -74,44 +74,44 @@ pub fn operation(ops: &[(Operation, usize)],offset: usize) {
         },
 
         Operation::PushNumber(v)=>{
-            println!("OP_PUSH_NUMBER | '{}'", v);         
+            eprintln!("OP_PUSH_NUMBER | '{}'", v);         
         },
         Operation::PushNil => {
-            println!("OP_PUSH_NIL");         
+            eprintln!("OP_PUSH_NIL");         
         },
         /*
         Operation::PushString(v)=>{
-            println!("OP_PUSH_STRING | '\"{}'\"", v);         
+            eprintln!("OP_PUSH_STRING | '\"{}'\"", v);         
         },
         Operation::PushArray(v)=>{
-            println!("OP_PUSH_ARRAY | '\"{} elements'\"", v);         
+            eprintln!("OP_PUSH_ARRAY | '\"{} elements'\"", v);         
         },
         Operation::PushObject(_)=>{
-            println!("OP_PUSH_OBJECT");         
+            eprintln!("OP_PUSH_OBJECT");         
         },
         Operation::PushGeneric(v)=>{
-            println!("OP_PUSH_GENERIC | '{}'", v.type_name());         
+            eprintln!("OP_PUSH_GENERIC | '{}'", v.type_name());         
         },
         */
         Operation::PushHeapRef(v)=>{
-            println!("OP_PUSH_HEAP_REF | slot '{}'", v);
+            eprintln!("OP_PUSH_HEAP_REF | slot '{}'", v);
         }
 
 
         Operation::GetLocal(i)=>{
-            println!("OP_GET_LOCAL | {}",i);
+            eprintln!("OP_GET_LOCAL | {}",i);
         },
         Operation::SetLocal(i)=>{
-            println!("OP_SET_LOCAL | {}",i);
+            eprintln!("OP_SET_LOCAL | {}",i);
         },
         Operation::GetGlobal(i)=>{
-            println!("OP_GET_LOCAL | {}",i);
+            eprintln!("OP_GET_LOCAL | {}",i);
         },
         Operation::GetFromPackage(i)=>{
-            println!("OP_GET_FROM_PACKAGE | {}",i);
+            eprintln!("OP_GET_FROM_PACKAGE | {}",i);
         },
         Operation::Pop(n)=>{
-            println!("OP_POP | {}",n);
+            eprintln!("OP_POP | {}",n);
         },
         
         Operation::Equal => {
@@ -142,23 +142,23 @@ pub fn operation(ops: &[(Operation, usize)],offset: usize) {
         },
 
         Operation::ForLoop(n_vars,body_length)=>{
-            println!("OP_FOR_LOOP | {} vars, length: {}",n_vars, body_length); 
+            eprintln!("OP_FOR_LOOP | {} vars, length: {}",n_vars, body_length); 
         },
 
         Operation::JumpIfFalse(n)=>{
-            println!("OP_JUMP_IF_FALSE | {} ops",n); 
+            eprintln!("OP_JUMP_IF_FALSE | {} ops",n); 
         },
 
         Operation::JumpIfTrue(n)=>{
-            println!("OP_JUMP_IF_TRUE | {} ops",n); 
+            eprintln!("OP_JUMP_IF_TRUE | {} ops",n); 
         },
 
         Operation::JumpBack(n)=>{
-            println!("OP_JUMP_BACK | {} ops",n); 
+            eprintln!("OP_JUMP_BACK | {} ops",n); 
         },
 
         Operation::Call(n)=>{
-            println!("OP_CALL | {} args",n); 
+            eprintln!("OP_CALL | {} args",n); 
         }
 
     }
@@ -171,7 +171,7 @@ pub fn operation(ops: &[(Operation, usize)],offset: usize) {
 #[allow(dead_code)]
 pub fn chunk(chunk : &[(Operation, usize)], name: String){
     
-    println!("== {} ==\n", name);
+    eprintln!("== {} ==\n", name);
 
     //let lines : &[usize]= &chunk.lines();
     //let ops : &[Operation]= &chunk.code();

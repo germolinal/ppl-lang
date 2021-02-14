@@ -94,17 +94,21 @@ impl ValueTrait for Function {
         format!("fn {}()",self.get_name())
     }
 
-    fn type_name(&self)->String{
+    fn type_name(&self)->String {
         "Function".to_string()
     }
 
-    fn is_function(&self)->bool{
+    fn is_function(&self)->bool {
         true
     }
     
     fn as_any(&self) -> &dyn Any{
         self
     }    
+
+    fn drop_references(&self, _h: &mut HeapList){
+        panic!("Do Functions need to drop references?")
+    }
 
     
 

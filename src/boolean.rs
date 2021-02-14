@@ -1,6 +1,8 @@
+use std::any::Any;
+
 use crate::value_trait::ValueTrait;
 use crate::values::Value;
-use std::any::Any;
+use crate::heap_list::HeapList;
 
 pub type Boolean = bool;
 
@@ -18,6 +20,8 @@ impl ValueTrait for Boolean {
         self
     }
 
+
+    fn drop_references(&self, _h: &mut HeapList){}
     
     
     fn not(&self)->Result<Value,String>{
