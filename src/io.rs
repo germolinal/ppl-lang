@@ -1,13 +1,23 @@
 use crate::handler::PPLHandler;
 use crate::package::Package;
 use crate::value_trait::ValueTrait;
+use crate::values::Value;
 use crate::vm::VM;
 
 fn print(n_args: u8, vm: &mut VM)->u8{
             
 
-    for _ in 0..n_args {        
-        print!("{} ", vm.pop().unwrap().to_string());
+    for _ in 0..n_args {    
+        let v = vm.pop().unwrap();
+        match v {
+            Value::HeapRef(_)=>{
+                print!("{} ", vm.resolve_heap_reference(v).unwrap().to_string())                
+            },
+            Value::PackageRef(_)=>{
+                print!("{} ", vm.resolve_package_reference(v).unwrap().to_string())                
+            },
+            _ => print!("{} ", v.to_string()),
+        }                
     }
     println!();
 

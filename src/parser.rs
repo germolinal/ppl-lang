@@ -5,8 +5,6 @@ use crate::parse_function::*;
 use crate::function::Function;
 use crate::operations::Operation;
 use crate::compiler::Compiler;
-use crate::heap_list::HeapList;
-use crate::package::{/*Package,*/ Packages};
 
 #[cfg(debug_assertions)]
 use crate::debug;
@@ -917,6 +915,7 @@ mod tests {
     use crate::vm::VM;
     use crate::chunk::Chunk;
     use crate::value_trait::ValueTrait;
+    use crate::heap_list::HeapList;
     
 
     // this is used in some calses below.
@@ -978,6 +977,8 @@ mod tests {
         assert!(!parser.consume(TokenType::Number));
         assert!(parser.consume(TokenType::LeftBrace));
     }
+
+    
 
     #[test]
     fn test_parse_number(){

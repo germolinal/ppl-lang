@@ -418,9 +418,11 @@ impl VM {
         }
     }
 
+    
+
     /// Calls a function
-    fn call(&mut self, n_vars: u8, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
-        let f_ref = self.stack[ self.stack.len() as u8 - n_vars - 1 ];
+    fn call(&mut self, n_args: u8, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
+        let f_ref = self.stack[ self.stack.len() as u8 - n_args - 1 ];
 
         let function = match f_ref {
             Value::HeapRef(i) => {
@@ -441,7 +443,7 @@ impl VM {
             _ => {
                 // THis is an error... this is here just to send a 
                 // better error message
-                match f_ref.call(self, n_vars){
+                match f_ref.call(self, n_args){
                     // This should never be successful because all 
                     // objects that can be called as functions 
                     // are in the heap (thus, HeapRef)
@@ -452,9 +454,25 @@ impl VM {
         };// end of retrieve the function
 
         if function.is_native(){
-            match function.call(self, n_vars){
+            
+            let stack_before = self.stack.len();
+
+            // Call the funciton
+            match function.call(self, n_args){
                 Ok(n_returns)=>{
-                    // Get the returned value
+                    
+                    
+                    // CHECK INTEGRITY OF THE STACK
+                    // it should have grown by n_return elements 
+                    // (pushed as results), and reduced by n_args
+                    // (popped when using the arguments)
+                    debug_assert_eq!(self.stack.len(), stack_before + n_returns - n_args);
+
+                    // At this stage, the stack should be
+                    // [..., NativeFn<>, return_value] if something was returned, or
+                    // simply [..., NativeFn<>] if nothing was returned
+
+                    // Get the returned value (or nil, if there is no return)
                     let ret : Value;
                     if n_returns == 0 {
                         ret = Value::Nil;
@@ -463,21 +481,21 @@ impl VM {
                     }else{                                        
                         panic!("Function '{}' returns more than one argument... this is a bug in that function.", function.get_name())
                     }                        
-                    
-                    // Pop all the arguments given.                    
-                    self.stack.drop_n(n_vars).unwrap();
-
-                    // And the function itself.                    
+                                                        
+                    // Pop the function itself
                     self.stack.drop_last().unwrap();
-
+    
                     // Push result
                     self.push(ret);
+                                        
                 },
                 Err(e)=>return Err(e)
             }
+            
+
 
         }else{
-            match self.call_script(function, n_vars){
+            match self.call_script(function, n_args){
                 Ok(_)=>{
                     *frame_n += 1;
                     *advance = false;
@@ -744,19 +762,40 @@ impl VM {
         Ok(())
     }
 
-        
+       
+    /// Pops the stack. Returns an error if empty
     pub fn pop(&mut self)->Result<Value,&str>{
-        if let Some(v)= self.stack.pop(){
+        if let Some(v) = self.stack.pop(){
             Ok(v)
         }else{
             Err("Trying to pop an empty stack")
         }
     }
 
-    pub fn get_last_stack(&self, n: u8)->&[Option<Value>]{
-        self.stack.last_n(n)
+    /// Fetches a Heap reference, returning a mutable reference to ut
+    pub fn resolve_heap_reference(&mut self, v: Value) -> Result<&mut Box<dyn ValueTrait>, &str> {
+        
+        if let Value::HeapRef(i)= v {
+            let v = self.handler.heap.get_mut(i);
+            match v {
+                None => Err("Reference points to NONE"),
+                Some(ret)=>Ok(ret)
+            }
+        } else {
+            Err("resolve_heap_reference() requires a Value::HeapRef() as an argument")
+        }
     }
 
+    /// Fetches a package references, returning a reference to it
+    pub fn resolve_package_reference(&self, v: Value) -> Result<&Function, &str> {
+        
+        if let Value::PackageRef(i)= v {
+            Ok(&self.handler.packages_elements[i])
+        } else {
+            Err("resolve_package_reference() requires a Value::PackageRef() as an argument")
+        }
+    }
+    
     
 }
 

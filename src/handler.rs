@@ -4,8 +4,6 @@ use crate::heap_list::HeapList;
 use crate::function::Function;
 use crate::package::{Packages,Package};
 use crate::native_fn::NativeFnType;
-use crate::values::Value;
-use crate::vm::{VM, InterpretResult};
 
 use crate::compiler::Compiler;
 use crate::parser::Parser;

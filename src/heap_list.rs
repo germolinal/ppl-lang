@@ -59,6 +59,18 @@ impl HeapList {
         }
     }
 
+    /// Borrows a mutable element from the HeapList
+    pub fn get_mut(&mut self, i: u8)->Option<&mut Box<dyn ValueTrait>>{
+        if self.elements.len() > i as usize {
+            match &mut self.elements[i as usize]{
+                None => None,
+                Some(e)=>Some(&mut e.value)
+            }            
+        }else{
+            None
+        }
+    }
+
     /// Sets n element in the HeapList
     pub fn set(&mut self, i: u8, value: Box<dyn ValueTrait>)->Result<(),String>{
         if self.elements.len() > i as usize {

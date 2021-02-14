@@ -4,16 +4,11 @@ use std::env;
 use std::fs;
 
 use ppl_lib::handler::PPLHandler;
+use ppl_lib::vm::{VM, InterpretResult};
+use ppl_lib::call_frame::CallFrame;
+
 // Packages
 use ppl_lib::io;
-
-use ppl_lib::vm::{VM, InterpretResult};
-use ppl_lib::compiler;
-use ppl_lib::call_frame::CallFrame;
-//use ppl_lib::heap_list::HeapList;
-//use ppl_lib::package::Packages;
-//use ppl_lib::function::Function;
-
 
 
 

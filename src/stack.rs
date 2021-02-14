@@ -100,16 +100,7 @@ impl <T>Stack<T>{
             Some(v)=>v,
             None=>panic!("Trying to borrow last element of empty stack")
         }
-    }
-
-    /// Borrows a slice containing the last N elements in the stack
-    pub fn last_n(&self, n: u8)->&[Option<T>]{
-        let fin = self.len as usize;
-        let ini = fin - n as usize;
-        &self.elements[ini..fin]
-    }
-
-    
+    }    
 
 
 }

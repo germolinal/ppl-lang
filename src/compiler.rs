@@ -1,9 +1,5 @@
 //use crate::options::Options;
 use crate::token::Token;
-use crate::function::Function;
-use crate::parser::Parser;
-use crate::package::{Packages};
-use crate::heap_list::HeapList;
 
 pub struct Local<'a> {
     pub name: Token<'a>,
@@ -71,7 +67,7 @@ impl <'a>Compiler<'a> {
             //    println!("local.depth < self.scope_depth");
             //    break;
             //}
-
+ 
             // if not the same length, don't bother
             if local.name.length == var.length && var_slice == local.name.source_slice(){                                
                 return true                
