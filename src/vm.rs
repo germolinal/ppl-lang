@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use std::env;
 
 use crate::handler::PPLHandler;
@@ -348,7 +349,7 @@ impl VM {
 
     /// Gets a local variable
     fn get_local(&mut self, absolute_position: u8)->Result<(),String>{
-        let local = self.stack[absolute_position];
+        let local = self.stack[absolute_position].clone();
         
         
         // Let the HEAP know that we are referencing this
@@ -357,7 +358,7 @@ impl VM {
         }
 
         // Push it    
-        self.push(local);  
+        self.push(local.clone());  
         Ok(())   
     }
 
@@ -381,7 +382,7 @@ impl VM {
         }
 
         // Replace
-        self.stack[absolute_position] = self.stack[last];
+        self.stack[absolute_position] = self.stack[last].clone();
         Ok(())
     }
 
@@ -424,7 +425,8 @@ impl VM {
 
     /// Calls a function
     fn call(&mut self, n_args: u8, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
-        let f_ref = self.stack[ self.stack.len() as u8 - n_args - 1 ];
+        
+        let f_ref = self.stack[ self.stack.len() as u8 - n_args - 1 ].clone();
 
         let function = match f_ref {
             Value::HeapRef(i) => {
@@ -690,7 +692,7 @@ impl VM {
                 // Print the stack
                 eprint!(" | Stack: [");                                            
                 for val in 0..self.stack.len() {                    
-                    let v = self.stack[val];
+                    let v = self.stack[val].clone();
                     eprint!("{}, ", v.to_string());                    
                 }
                 eprintln!("]");

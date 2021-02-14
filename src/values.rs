@@ -8,7 +8,7 @@ use crate::number::Number;
 use crate::boolean::Boolean;
 
 
-#[derive(Copy,Clone)]
+#[derive(Clone)]
 pub enum Value {
     
     /// This represents an empty variable
