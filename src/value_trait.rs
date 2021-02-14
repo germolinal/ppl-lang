@@ -10,7 +10,7 @@ pub trait ValueTrait {
 
     fn as_any(&self) -> &dyn Any;    
 
-    fn call(&self, _h: &mut VM, _n: u8)->Result<u8,String>{
+    fn call(&self, _vm: &mut VM, _n: u8)->Result<u8,String>{
         Err(format!("Cannot Call type '{}'... it is not a Function", self.type_name()))
     }
 

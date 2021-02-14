@@ -1,63 +1,55 @@
 use std::collections::HashMap;
 
-use crate::package::{Packages, Package};
-use crate::vm::{VM,InterpretResult};
+use crate::heap_list::HeapList;
+use crate::function::Function;
+use crate::package::{Packages,Package};
+use crate::native_fn::NativeFnType;
+use crate::values::Value;
+use crate::vm::{VM, InterpretResult};
+
+use crate::compiler::Compiler;
 use crate::parser::Parser;
 
-use crate::values::Value;
-
-pub struct Handler<'a>{
-    vm : VM,
-    parser: Parser<'a>,    
-    packages : Packages,    
+pub struct PPLHandler {
+    pub heap: HeapList,
+    pub packages_elements : Vec<Function>,
+    pub packages_dictionary : Packages,    
 }
 
-impl <'a>Handler<'a> {
+impl PPLHandler{
 
-    pub fn new(source: &'a Vec<u8>)->Self{
+    /// Creates a new Handler
+    pub fn new()->Self{
         Self{
-            parser: Parser::new(source),
-            packages: HashMap::new(),
-            vm: VM::new(),            
+            heap : HeapList::new(),
+            packages_elements : Vec::with_capacity(64),
+            packages_dictionary : HashMap::new(),            
         }
     }
 
-    pub fn run(&mut self){
-        match self.parser.compile(){
-            Some(f)=>{
+    /// Registers a Rust function 
+    pub fn register_rust_function(&mut self, name: &str, func: NativeFnType, package: &mut Package)->Result<(),String>{
+        package.register_rust_func(name, func, &mut self.packages_elements)
+    }
 
-                let (code, lines) = f.chunk().to_slices();//self.parser.current_function().chunk().to_slices();
-
-                match self.vm.run(code,lines, f.chunk().constants()){
-                    InterpretResult::Ok(_) => {
-    
-                    },
-                    //InterpretResult::CompileError(e)=>panic!("Compile Error: {}",e),
-                    InterpretResult::RuntimeError(e)=>panic!("Runtime Error: {}",e),
-    
-                }
-            }
-            None=>{                
-                panic!("ERROR WHEN PARSING")                
-            }   
+    /// Registers a package in the handler
+    pub fn register_package(&mut self, package: Package)->Result<(),String>{
+        if self.packages_dictionary.contains_key(&package.name){
+            return Err(format!("Package '{}' already exists", package.name))
         }
+        self.packages_dictionary.insert(package.name.clone(), package);
+        Ok(())
+    }   
+
+
+    /// Compiles a source code
+    pub fn compile<'a>(&mut self, source: &'a [u8]/*, heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>*/) -> Option<Function> {            
         
+        let mut compiler = Compiler::new();
+        let mut parser = Parser::new(source);
+
+        parser.program(self, &mut compiler)//heap, packages_dictionary, packages_elements)
+
     }
 
-    pub fn pop_stack(&mut self)->Result<Value,&str>{
-        self.vm.pop()
-    }
-
-    pub fn push_stack(&mut self, v: Value){
-        self.vm.push(v)
-    }
-    
-
-    pub fn push_package(&mut self, pkg: Package){
-        let name = pkg.name.clone();
-        match self.packages.insert(name, pkg){
-            None => {},
-            Some(_) => panic!("Package '{}' is already registered")
-        }
-    }
 }

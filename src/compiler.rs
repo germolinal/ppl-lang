@@ -1,4 +1,4 @@
-use crate::options::Options;
+//use crate::options::Options;
 use crate::token::Token;
 use crate::function::Function;
 use crate::parser::Parser;
@@ -11,40 +11,20 @@ pub struct Local<'a> {
     initialized: bool    
 }
 
-
-#[derive(PartialEq)]
-pub enum CompilerOptions {
-    Optimize
-}
-
 pub struct Compiler<'a> {
-
     pub locals: Vec<Local<'a>>,    
-    pub scope_depth: usize,
-
-    pub optimize: bool,    
+    pub scope_depth: usize,    
 }
 
 
-pub fn compile<'a>(source: &'a [u8], heap: &mut HeapList, packages_dictionary: &mut Packages, packages_elements: &mut Vec<Function>) -> Option<Function> {            
-    let compiler_options : Options<CompilerOptions> = vec![];
-
-    let mut compiler = Compiler::new(compiler_options);
-    let mut parser = Parser::new(source);
-
-    parser.program(&mut compiler, heap, packages_dictionary, packages_elements)
-
-}
 
 impl <'a>Compiler<'a> {
 
     /// Creates an empty compiler.
-    pub fn new( options: Options<CompilerOptions> )->Self{        
+    pub fn new( )->Self{        
         Self{
             locals: Vec::with_capacity(200),            
-            scope_depth: 0,
-            optimize: options.contains(&CompilerOptions::Optimize),
-
+            scope_depth: 0,            
         }
     }
 
@@ -161,7 +141,7 @@ mod tests {
     #[test]
     fn test_add_local(){
 
-        let mut compiler = Compiler::new(vec![]);
+        let mut compiler = Compiler::new();
         let src = vec!['H' as u8,'e' as u8,'l' as u8, 'l' as u8, 'o' as u8];
 
         let token = Token{
@@ -184,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_var_is_in_scope(){
-        let mut compiler = Compiler::new(vec![]);
+        let mut compiler = Compiler::new();
         let src = vec!['H' as u8,'e' as u8,'l' as u8, 'l' as u8, 'o' as u8];
 
         let token = Token{
@@ -211,7 +191,7 @@ mod tests {
     #[test]
     fn test_get_local(){
 
-        let mut compiler = Compiler::new(vec![]);
+        let mut compiler = Compiler::new();
         let src = vec!['H' as u8,'e' as u8,'l' as u8, 'l' as u8, 'o' as u8];
 
         let token = Token{

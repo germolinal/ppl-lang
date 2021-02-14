@@ -4,7 +4,6 @@ use std::rc::Rc;
 use crate::native_fn::NativeFn;
 use crate::script_fn::ScriptFn;
 use crate::value_trait::ValueTrait;
-use crate::values::Value;
 use crate::chunk::Chunk;
 use crate::vm::VM;
 use crate::heap_list::HeapList;
@@ -125,7 +124,7 @@ impl ValueTrait for Function {
                 // Get the function
                 let rust_fn = f.func;                                
                 // Call it
-                Ok(rust_fn(vm,n_args))
+                Ok(rust_fn(n_args, vm))
             }
         }
     }

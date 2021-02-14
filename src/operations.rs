@@ -31,8 +31,7 @@ pub enum Operation {
     GetGlobal(u8),
     GetFromPackage(usize),
 
-    Pop(u8),
-    DefineVars(u8),
+    Pop(u8),    
     
     ForLoop(u8,u8),
     JumpIfFalse(u8),

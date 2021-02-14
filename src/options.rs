@@ -9,7 +9,6 @@ pub type Options<T> = Vec<T>;
 #[cfg(test)]
 mod tests {
     use super::*;    
-    use crate::compiler::CompilerOptions;
     
     
 

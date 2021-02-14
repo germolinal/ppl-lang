@@ -1,4 +1,4 @@
-mod options;
+//mod options;
 
 mod values;
 mod value_trait;
@@ -20,7 +20,7 @@ mod token;
 mod parse_function;
 
 mod parser;
-//mod handler;
+pub mod handler;
 
 pub mod io;
 

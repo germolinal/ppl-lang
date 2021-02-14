@@ -1,10 +1,9 @@
-
+use crate::handler::PPLHandler;
 use crate::operations::*;
 use crate::values::*;
 use crate::value_trait::ValueTrait;
 use crate::call_frame::CallFrame;
 use crate::function::Function;
-use crate::heap_list::HeapList;
 use crate::stack::Stack;
 
 #[cfg(debug_assertions)]
@@ -20,16 +19,18 @@ pub enum InterpretResult {
 pub struct VM {
     call_frames: Stack<CallFrame>,
     stack: Stack<Value>,    
+    handler: PPLHandler
 }
 
 
 impl VM {
     
-    pub fn new()-> Self {
+    pub fn new( handler : PPLHandler)-> Self {
                     
         Self {            
+            handler,
             call_frames: Stack::new(),
-            stack: Stack::new()
+            stack: Stack::new(),
         }
 
     }    
@@ -122,25 +123,7 @@ impl VM {
         self.stack.drop_n(n)        
     }
 
-    fn define_vars(&mut self, n: u8)->Result<(),String>{
-        for _ in 0..n{
-            match self.pop(){
-                Ok(_v) => {
-                    unimplemented!();
-                    /*
-                    let length = self.stack.len();
-                    let dest = length - *n;
-                    if let Value::VarRef(i) = self.stack[dest]{                                    
-                    }else{
-                        // ignore returned value
-                    }
-                    */
-                },
-                Err(e)=> {return Err(e.to_string());}
-            }
-        }
-        Ok(())
-    }
+    
 
     //#[inline]
     fn negate(&mut self)->Result<(),String>{
@@ -359,16 +342,69 @@ impl VM {
     }
 
 
-    /// Calls a Script Function
-    fn call_script(&mut self, fn_index: u8, n_vars: u8,  heap: &HeapList)-> Result<(),String> {
-        // get the function from the surrounding function (i.e. the current one)                                                                        
-        let function = match heap.get(fn_index).unwrap()
-        .as_any()
-        .downcast_ref::<Function>(){
-            Some(f)=>f.clone_rc(),
-            None => return Err(format!("Trying to call from a '{}' object as if it was a function", heap.get(fn_index).unwrap().type_name()))
-        };
     
+
+    /// Gets a local variable
+    fn get_local(&mut self, absolute_position: u8)->Result<(),String>{
+        let local = self.stack[absolute_position];
+        
+        
+        // Let the HEAP know that we are referencing this
+        if let Value::HeapRef(i) = local {
+            self.handler.heap.add_reference(i);
+        }
+
+        // Push it    
+        self.push(local);  
+        Ok(())   
+    }
+
+    
+    /// Sets local variable
+    fn set_local(&mut self, absolute_position: u8)->Result<(),String>{
+        let last = self.stack.len()-1;
+                
+        // If this value, which will be removed, pointed to 
+        // the heap, let the heap know
+        if let Value::HeapRef(heap_ref) = self.stack[absolute_position] {
+            self.handler.heap.drop_reference(heap_ref);
+        }
+
+        // Check if the value to be assigned is a Function...
+        // we don't allow that.                    
+        if let Value::HeapRef(heap_ref) = self.stack[last]{
+            if self.handler.heap.get(heap_ref).unwrap().is_function(){
+                return Err("Cannot assign a function into a variable".to_string());
+            }
+        }
+
+        // Replace
+        self.stack[absolute_position] = self.stack[last];//self.pop().unwrap();                                                                                                                 
+        Ok(())
+    }
+
+    /// Gets a global variable
+    //#[inline]
+    fn get_global(&mut self, i: u8)->Result<(),String>{
+        if !self.handler.heap.get(i).unwrap().is_function(){
+            return Err( "Trying to get a reference to a non-function global variable".to_string() )
+        }
+        self.handler.heap.add_reference(i);
+        self.push(Value::HeapRef(i));
+        Ok(())
+    }
+
+    /// Gets a value from package
+    //#[inline]
+    fn get_from_package(&mut self, i: usize)->Result<(),String>{
+        self.push(Value::PackageRef(i));
+        Ok(())
+    }
+
+    /// Calls a Script Function
+    fn call_script(&mut self, function: Function, n_vars: u8)-> Result<(),String> {
+        
+        // get the function from the surrounding function (i.e. the current one)                                                                                
         match function.call(self, n_vars){
             Ok(_n_returns)=>{
                 // Add the function to the stack, and continue 
@@ -382,120 +418,30 @@ impl VM {
         }
     }
 
-    /// Gets a local variable
-    fn get_local(&mut self, absolute_position: u8, heap: &mut HeapList)->Result<(),String>{
-        let local = self.stack[absolute_position];
-        
-        
-        // Let the HEAP know that we are referencing this
-        if let Value::HeapRef(i) = local {
-            heap.add_reference(i);
-        }
-
-        // Push it    
-        self.push(local);  
-        Ok(())   
-    }
-
-    
-    /// Sets local variable
-    fn set_local(&mut self, absolute_position: u8,heap: &mut HeapList)->Result<(),String>{
-        let last = self.stack.len()-1;
-                
-        // If this value, which will be removed, pointed to 
-        // the heap, let the heap know
-        if let Value::HeapRef(heap_ref) = self.stack[absolute_position] {
-            heap.drop_reference(heap_ref);
-        }
-
-        // Check if the value to be assigned is a Function...
-        // we don't allow that.                    
-        if let Value::HeapRef(heap_ref) = self.stack[last]{
-            if heap.get(heap_ref).unwrap().is_function(){
-                return Err("Cannot assign a function into a variable".to_string());
-            }
-        }
-
-        // Replace
-        self.stack[absolute_position] = self.stack[last];//self.pop().unwrap();                                                                                                                 
-        Ok(())
-    }
-
-    /// Gets a global variable
-    //#[inline]
-    fn get_global(&mut self, i: u8, heap: &mut HeapList)->Result<(),String>{
-        if !heap.get(i).unwrap().is_function(){
-            return Err( "Trying to get a reference to a non-function global variable".to_string() )
-        }
-        heap.add_reference(i);
-        self.push(Value::HeapRef(i));
-        Ok(())
-    }
-
-    /// Gets a value from package
-    //#[inline]
-    fn get_from_package(&mut self, i: usize)->Result<(),String>{
-        self.push(Value::PackageRef(i));
-        Ok(())
-    }
-
     /// Calls a function
-    fn call(&mut self, n_vars: u8, heap: &mut HeapList, packages_elements: &[Function], frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
+    fn call(&mut self, n_vars: u8, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
         let f_ref = self.stack[ self.stack.len() as u8 - n_vars - 1 ];
 
-        match f_ref {
+        let function = match f_ref {
             Value::HeapRef(i) => {
-                                
-                match self.call_script(i, n_vars, heap){
-                    Ok(_)=>{
-                        *frame_n += 1;
-                        *advance = false;
-                    },
-                    Err(e)=>return Err(e)
-                }
-                
-                
+                match self.handler.heap.get(i).unwrap()
+                    .as_any()
+                    .downcast_ref::<Function>(){
+                        Some(f)=>f.clone_rc(),
+                        None => return Err(format!("Trying to call from a '{}' object as if it was a function", self.handler.heap.get(i).unwrap().type_name()))
+                    }                                                
             },
             Value::PackageRef(i) => {
                                 
                 // get the function from the surrounding function (i.e. the current one)                                                                        
-                let function = packages_elements[i as usize].clone_rc();
-                
-                // Native functions don't push a callframe.
-                match function.call(self,n_vars){
-                    Ok(n_returns)=>{
-                        // Get the returned value
-                        let ret : Value;
-                        if n_returns == 0 {
-                            ret = Value::Nil;
-                        }else if n_returns == 1{
-                            ret = self.pop().unwrap();
-                        }else{                                        
-                            panic!("Native Function '{}' returns more than one argument... this is a bug in that function.", function.get_name())
-                        }                        
-                        
-                        // Pop all the arguments given.
-                        //for _ in 0..n_vars{
-                            //self.pop().unwrap();                            
-                        //}
-                        self.stack.drop_n(n_vars).unwrap();
-
-                        // And the function itself.
-                        //self.pop().unwrap();
-                        self.stack.drop_last().unwrap();
-
-                        // Push result
-                        self.push(ret);
-                    },
-                    Err(e)=>return Err(e)
-                }
+                //let function = 
+                self.handler.packages_elements[i as usize].clone_rc()
                                                                                             
-
             },
             _ => {
                 // THis is an error... this is here just to send a 
                 // better error message
-                match f_ref.call(self,n_vars){
+                match f_ref.call(self, n_vars){
                     // This should never be successful because all 
                     // objects that can be called as functions 
                     // are in the heap (thus, HeapRef)
@@ -503,9 +449,47 @@ impl VM {
                     Err(e)=>return Err(e)
                 }
             }
+        };// end of retrieve the function
+
+        if function.is_native(){
+            match function.call(self, n_vars){
+                Ok(n_returns)=>{
+                    // Get the returned value
+                    let ret : Value;
+                    if n_returns == 0 {
+                        ret = Value::Nil;
+                    }else if n_returns == 1{
+                        ret = self.pop().unwrap();
+                    }else{                                        
+                        panic!("Function '{}' returns more than one argument... this is a bug in that function.", function.get_name())
+                    }                        
+                    
+                    // Pop all the arguments given.                    
+                    self.stack.drop_n(n_vars).unwrap();
+
+                    // And the function itself.                    
+                    self.stack.drop_last().unwrap();
+
+                    // Push result
+                    self.push(ret);
+                },
+                Err(e)=>return Err(e)
+            }
+
+        }else{
+            match self.call_script(function, n_vars){
+                Ok(_)=>{
+                    *frame_n += 1;
+                    *advance = false;
+                },
+                Err(e)=>return Err(e)
+            }
         }
+
         Ok(())
     }
+
+
 
     /// Return operation
     fn return_op(&mut self, frame_n: &mut u8)->Result<(),String>{
@@ -537,7 +521,7 @@ impl VM {
     }
 
     /// Grabs an operation and performs the appropriate action
-    fn perform_operation(&mut self, /*current_operation: Operation,*/ heap: &mut HeapList, packages_elements: &[Function], frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
+    fn perform_operation(&mut self, /*current_operation: Operation, handler: &mut PPLHandler,*/ frame_n: &mut u8, first_call_frame_slot: u8, advance: &mut bool)->Result<(),String>{
         let current_operation =self.call_frames[*frame_n].current_instruction().unwrap();            
 
         match current_operation {
@@ -558,14 +542,14 @@ impl VM {
             }                                   
             Operation::GetLocal(i)=>{                      
                 let absolute_position = i  + first_call_frame_slot;
-                self.get_local(absolute_position, heap)                                                                                              
+                self.get_local(absolute_position)                                                                                              
             },
             Operation::SetLocal(i)=>{      
                 let absolute_position = i + first_call_frame_slot;
-                self.set_local(absolute_position, heap)
+                self.set_local(absolute_position)
             },    
             Operation::GetGlobal(i)=>{                    
-                self.get_global(i, heap)
+                self.get_global(i)
             },         
             Operation::GetFromPackage(i)=>{                                        
                 self.get_from_package(i)
@@ -573,10 +557,7 @@ impl VM {
             Operation::Pop(n)=>{                    
                 self.pop_n(n)
             },
-            
-            Operation::DefineVars(n)=>{
-                self.define_vars(n)
-            },
+                        
             // Unary operations
             Operation::Negate =>{   
                 self.negate()                                                                         
@@ -642,7 +623,7 @@ impl VM {
             },                 
             Operation::Call(n_vars)=>{
                                     
-                self.call(n_vars, heap, packages_elements, frame_n, advance)
+                self.call(n_vars, frame_n, advance)
 
             }// end of Operation::Call    
 
@@ -655,7 +636,7 @@ impl VM {
 
 
     /// Runs the last CallFrame in the call_stack
-    pub fn run( &mut self, heap: &mut HeapList, packages_elements: &[Function] ) -> InterpretResult {
+    pub fn run( &mut self) -> InterpretResult {
                         
         let mut frame_n = self.call_frames.len() - 1;
         
@@ -718,7 +699,7 @@ impl VM {
                 }
             }else{                
 
-                match self.perform_operation(/*current_operation,*/ heap, packages_elements, &mut frame_n, first_call_frame_slot, &mut advance){
+                match self.perform_operation(/*current_operation, &mut self.handler,*/ &mut frame_n, first_call_frame_slot, &mut advance){
                     Ok(_)=>{},
                     Err(e)=>{return InterpretResult::RuntimeError(e)}
                 }
@@ -800,13 +781,15 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_pop_empty_stack(){
-        let mut vm = VM::new();
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
         vm.pop().unwrap();
     }
 
     #[test]
     fn test_push_pop(){
-        let mut vm = VM::new();
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
         
         assert_eq!(vm.stack.len(),0);
                 
@@ -849,13 +832,12 @@ mod tests {
             c.push((Operation::Return, 0));                        
         }
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
-        vm.push_call_frame(CallFrame::new(0, function.clone_rc() ));
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
         
-        //let c = function.chunk().unwrap();
-        assert!(vm.run(&mut heap, &packages_elements).is_ok()); 
+        vm.push_call_frame(CallFrame::new(0, function.clone_rc() ));
+
+        assert!(vm.run().is_ok()); 
 
         let v2 = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(v2,-v);
@@ -879,11 +861,11 @@ mod tests {
 
         }
                 
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&mut heap, &packages_elements).is_ok());
+        assert!(!vm.run().is_ok());
         
                     
 
@@ -898,11 +880,11 @@ mod tests {
     
         }        
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);        
+        
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&mut heap, &packages_elements).is_ok());
+        assert!(vm.run().is_ok());
                         
         
     }
@@ -926,11 +908,11 @@ mod tests {
         }
         
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&mut heap, &packages_elements).is_ok());                                
+        assert!(vm.run().is_ok());                                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a+b,c);
@@ -950,11 +932,11 @@ mod tests {
             chunk.push((Operation::Return, 0));                                        
         }
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&mut heap, &packages_elements).is_ok());                             
+        assert!(!vm.run().is_ok());                             
 
     }
 
@@ -975,11 +957,11 @@ mod tests {
             chunk.push((Operation::Return, 0));                                
         }
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&mut heap, &packages_elements).is_ok());                              
+        assert!(vm.run().is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a-b,c);
@@ -1004,11 +986,11 @@ mod tests {
         
         
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&mut heap, &packages_elements).is_ok());                             
+        assert!(!vm.run().is_ok());                             
     }
 
     #[test]
@@ -1030,12 +1012,11 @@ mod tests {
         }
         
 
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+        
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-
-        assert!(vm.run(&mut heap, &packages_elements).is_ok());                
+        assert!(vm.run().is_ok());                
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a*b,c);
@@ -1056,11 +1037,11 @@ mod tests {
             chunk.push((Operation::Return, 0));                        
         }
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+        
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));                
-        assert!(!vm.run(&mut heap, &packages_elements).is_ok());                              
+        assert!(!vm.run().is_ok());                              
 
     }
 
@@ -1082,11 +1063,12 @@ mod tests {
             chunk.push((Operation::Return, 0));                        
         }
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+        
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(vm.run(&mut heap, &packages_elements).is_ok());                              
+        assert!(vm.run().is_ok());                              
 
         let c = vm.pop().unwrap().get_number().unwrap();
         assert_eq!(a / b,c);
@@ -1107,10 +1089,10 @@ mod tests {
 
         }
         
-        let mut vm = VM::new();
-        let mut heap = HeapList::new();
-        let packages_elements : Vec<Function> = Vec::with_capacity(64);
+        let handler = PPLHandler::new();
+        let mut vm = VM::new(handler);
+        
         vm.push_call_frame(CallFrame::new(0,function.clone_rc()));
-        assert!(!vm.run(&mut heap, &packages_elements).is_ok());                                
+        assert!(!vm.run().is_ok());                                
     }
 }

@@ -113,10 +113,7 @@ pub fn operation(ops: &[(Operation, usize)],offset: usize) {
         Operation::Pop(n)=>{
             println!("OP_POP | {}",n);
         },
-        Operation::DefineVars(n)=>{
-            println!("OP_DEFINE_VARS | {}",n);
-        },
-
+        
         Operation::Equal => {
             simple_instruction("OP_EQUAL", offset );
         },
