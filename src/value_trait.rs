@@ -24,10 +24,7 @@ pub trait ValueTrait {
     fn get_next(&self)->Option<(Value,Value)>{
         None
     }
-
-    // Drop
-    fn drop_references(&self, _h: &mut HeapList);
-
+    
     // Operators
     fn not(&self)->Result<Value,String>{
         Err(format!("Operator '!' cannot be applied to type '{}'", self.type_name()))
@@ -85,6 +82,8 @@ pub trait ValueTrait {
             Err(e)=>Err(e),
         }      
     }
+
+    fn mark_as_reachable(&self, _h: &mut HeapList);
 
     
     

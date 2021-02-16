@@ -160,14 +160,15 @@ impl ValueTrait for Value  {
     fn as_any(&self) -> &dyn Any{
         self
     }
-
-    fn drop_references(&self, heap: &mut HeapList){
+    
+    
+    fn mark_as_reachable(&self, heap: &mut HeapList){
         match self {
-            Value::Nil => ValueTrait::drop_references(&Nil::new(),heap),
-            Value::Number(v) => ValueTrait::drop_references(v, heap),
-            Value::Bool(v) => ValueTrait::drop_references(v, heap),
+            Value::Nil => ValueTrait::mark_as_reachable(&Nil::new(),heap),
+            Value::Number(v) => ValueTrait::mark_as_reachable(v, heap),
+            Value::Bool(v) => ValueTrait::mark_as_reachable(v, heap),
             Value::HeapRef(i)=>{
-                heap.drop_reference(*i)
+                heap.mark_as_reachable(*i)
             },
             Value::PackageRef(_)=>{
                 panic!("Trying to drop references from PackageRef")

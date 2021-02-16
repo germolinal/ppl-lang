@@ -18,10 +18,7 @@ impl ValueTrait for Boolean {
 
     fn as_any(&self) -> &dyn Any{
         self
-    }
-
-
-    fn drop_references(&self, _h: &mut HeapList){}
+    }    
     
     
     fn not(&self)->Result<Value,String>{
@@ -36,4 +33,8 @@ impl ValueTrait for Boolean {
         }
     }
 
+    fn mark_as_reachable(&self, _h: &mut HeapList){
+        return
+    }
+    
 }

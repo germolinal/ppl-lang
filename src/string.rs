@@ -19,7 +19,8 @@ impl ValueTrait for StringV {
         self
     }
 
-    fn drop_references(&self, _h: &mut HeapList){
+    fn mark_as_reachable(&self, _h: &mut HeapList){
+        return
     }
     
         

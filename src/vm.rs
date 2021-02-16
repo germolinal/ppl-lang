@@ -350,13 +350,7 @@ impl VM {
     /// Gets a local variable
     fn get_local(&mut self, absolute_position: u8)->Result<(),String>{
         let local = self.stack[absolute_position].clone();
-        
-        
-        // Let the HEAP know that we are referencing this
-        if let Value::HeapRef(i) = local {
-            self.handler.heap.add_reference(i);
-        }
-
+                        
         // Push it    
         self.push(local.clone());  
         Ok(())   
@@ -366,13 +360,7 @@ impl VM {
     /// Sets local variable
     fn set_local(&mut self, absolute_position: u8)->Result<(),String>{
         let last = self.stack.len()-1;
-                
-        // If the value that will be replaced pointed to 
-        // the heap, let the heap know
-        if let Value::HeapRef(heap_ref) = self.stack[absolute_position] {
-            self.handler.heap.drop_reference(heap_ref);
-        }
-
+                        
         // Check if the value to be assigned is a Function...
         // we don't allow that.                    
         if let Value::HeapRef(heap_ref) = self.stack[last]{
@@ -391,8 +379,7 @@ impl VM {
     fn get_global(&mut self, i: u8)->Result<(),String>{
         if !self.handler.heap.get(i).unwrap().is_function(){
             return Err( "Trying to get a reference to a non-function global variable".to_string() )
-        }
-        self.handler.heap.add_reference(i);
+        }        
         self.push(Value::HeapRef(i));
         Ok(())
     }

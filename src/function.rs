@@ -106,8 +106,8 @@ impl ValueTrait for Function {
         self
     }    
 
-    fn drop_references(&self, _h: &mut HeapList){
-        panic!("Do Functions need to drop references?")
+    fn mark_as_reachable(&self, _h: &mut HeapList){
+        return
     }
 
     

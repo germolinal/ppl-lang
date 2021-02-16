@@ -5,7 +5,7 @@ use crate::token::Token;
 
 struct Element {
     pub value: Box<dyn ValueTrait>,
-    pub n_refs: u8,
+    reachable: bool,
 }
 
 pub struct HeapList {
@@ -74,14 +74,10 @@ impl HeapList {
     /// Sets n element in the HeapList
     pub fn set(&mut self, i: u8, value: Box<dyn ValueTrait>)->Result<(),String>{
         if self.elements.len() > i as usize {
-            let old_refs = match &self.elements[i as usize]{
-                Some(v)=>v.n_refs,
-                None => 0
-            };
-
+            
             self.elements[i as usize] = Some(Element {
                 value,
-                n_refs: old_refs,
+                reachable: true, // This is irrelevant... it will be erased during Garbage Collection
             });
             Ok(())
         }else{
@@ -90,50 +86,35 @@ impl HeapList {
         }
     }
 
-    /// Adds a reference to the element.
-    pub fn add_reference(&mut self, i: u8) {
-        if self.elements.len() as u8 > i {
-            match &mut self.elements[i as usize]{
-                None => panic!("Trying to add_reference() to 'None' element in HeapStack... element {}",i),
-                Some(e)=> e.n_refs += 1 
-            }
-        }else{
-            panic!("Trying to add_reference() to element out of bounds in HeapList... index was {}, length is {}", i, self.len())
-        }
-    }
-
     
 
-    /// Removes a reference to an element in the HeapList.
-    /// 
-    /// If the number of references becomes Zero, the element
-    /// is dropped
-    pub fn drop_reference(&mut self, i: u8) {
+    /// Marks an element as reachable.        
+    pub fn mark_as_reachable(&mut self, i: u8) {        
         if self.elements.len() > i as usize {
             match &mut self.elements[i as usize]{
-                None => panic!("Trying to drop_reference() to 'None' element in HeapStack... element {}",i),
-                Some(e)=> {      
-                    eprintln!("Dropping reference from object {} in the heap. It had {}", i, e.n_refs);
-                    e.n_refs -= 1;
-                    // If references to this object are now Zero, drop it
-                    if e.n_refs == 0 {
-                        eprintln!("    ...Dropping Object at index {} in the heap", i);
-
-                        // Recursively drop these references as well (e.g., when it is an 
-                        // array or an object)
-                        let element = self.elements[i as usize].take().unwrap();                        
-                        element.value.drop_references(self);
-                        drop(element);
-                        self.n_elements -= 1;
-                        // Take note that this is now free.
-                        if i < self.first_free {
-                            self.first_free = i;
-                        }
-                    }
+                None => panic!("Trying to mark_as_reachable() to 'None' element in HeapList... element {}",i),
+                Some(e)=> {
+                    e.reachable=true;
+                    /*
+                    let v = &e.value;
+                    // Propagate
+                    if v.is_object(){
+                        self.mark_object_as_reachable(v);
+                    }else if v.is_array(){
+                        self.mark_array_as_reachable(v);
+                    }else if v.is_function(){
+                        self.mark_function_as_reachable(v);
+                    }else if v.is_number() || v.is_bool() || v.is_nil() {
+                        return
+                    }else{
+                        panic!("Marking '{}' has not been implemented", v.type_name());
+                    }                    
+                    */
                 }
             }
+                        
         }else{
-            panic!("Trying to drop_reference() to element out of bounds in HeapList... index was {}, length is {}", i, self.len())
+            panic!("Trying to mark_as_reachable() to element out of bounds in HeapList... index was {}, length is {}", i, self.len())
         }
     }
 
@@ -152,7 +133,7 @@ impl HeapList {
         // If it is not full, and we are replacing a None element, 
         // then push.
         self.elements[self.first_free as usize] = Some(Element{
-            n_refs: 0,
+            reachable: true, // This is irrelevant... it is changed during Garbage Collection
             value: v
         });
 
@@ -215,17 +196,7 @@ mod tests {
     use super::*;
     //use crate::number::Number;
 
-    impl HeapList {
-        pub fn n_refs(&self, i: u8)->Option<u8>{
-            match self.elements.get(i as usize){
-                None => panic!("Trying to get n_refs from element out of bounds in HeapList... index was {}, length is {}", i, self.len()),
-                Some(e) => match e{
-                    Some(v)=> Some(v.n_refs),
-                    None => None
-                }
-            }
-        }
-    }
+    
 
     #[test]
     fn test_new(){
@@ -240,20 +211,17 @@ mod tests {
         assert_eq!(heap.len(),0);
 
         let i = heap.push(Box::new(12.0));
-        assert_eq!(i, 0);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
+        assert_eq!(i, 0);        
         assert_eq!(heap.first_free, 1);
         assert_eq!(heap.len(),1);
 
         let i = heap.push(Box::new(32.0));
-        assert_eq!(i, 1);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
+        assert_eq!(i, 1);        
         assert_eq!(heap.first_free, 2);
         assert_eq!(heap.len(),2);
 
         let i = heap.push(Box::new(39.0));
-        assert_eq!(i, 2);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
+        assert_eq!(i, 2);        
         assert_eq!(heap.first_free, 3);
         assert_eq!(heap.len(),3);
 
@@ -262,68 +230,5 @@ mod tests {
         assert_eq!(heap.len(),3);
     }
 
-    #[test]
-    fn test_references(){
-        // Create list
-        let mut heap = HeapList::new();
-        assert_eq!(heap.len(),0);
-
-        // Adda bunch of elements
-        let i = heap.push(Box::new(12.0));
-        assert_eq!(i, 0);
-        assert_eq!(heap.first_free, 1);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
-        assert_eq!(heap.len(),1);
-
-        let i = heap.push(Box::new(32.0));
-        assert_eq!(i, 1);
-        assert_eq!(heap.first_free, 2);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
-        assert_eq!(heap.len(),2);
-
-        let i = heap.push(Box::new(39.0));
-        assert_eq!(i, 2);
-        assert_eq!(heap.first_free, 3);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
-        assert_eq!(heap.len(),3);
-
-        // Add references
-        let i = 0;
-        assert!(heap.get(i).is_some());
-
-        heap.add_reference(i as u8);
-        assert_eq!(heap.n_refs(i).unwrap(), 1 as u8);
-        assert_eq!(heap.first_free, 3);
-        assert_eq!(heap.len(),3);
-
-        heap.add_reference(i as u8);
-        assert_eq!(heap.n_refs(i).unwrap(), 2 as u8);
-        assert_eq!(heap.first_free, 3);
-        assert_eq!(heap.len(),3);
-
-        // Drop all references in element 0
-        heap.drop_reference(i);
-        assert_eq!(heap.n_refs(i).unwrap(), 1 as u8);
-        assert_eq!(heap.first_free, 3);
-        assert_eq!(heap.len(),3);
-
-        heap.drop_reference(i);
-        assert!(heap.get(i).is_none());
-        assert_eq!(heap.first_free, 0);
-        assert_eq!(heap.len(),2);
-
-        // Push some more
-        let i = heap.push(Box::new(139.0));
-        assert_eq!(i, 0);
-        assert_eq!(heap.first_free, 3);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
-        assert_eq!(heap.len(),3);
-
-        let i = heap.push(Box::new(239.0));
-        assert_eq!(i, 3);
-        assert_eq!(heap.first_free, 4);
-        assert_eq!(heap.n_refs(i).unwrap(), 0 as u8);
-        assert_eq!(heap.len(),4);
-    }
-
+    
 }
