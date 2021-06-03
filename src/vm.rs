@@ -38,8 +38,16 @@ impl VM {
 
     }    
 
-    
-    
+    /// Retrieves the length of the stack
+    pub fn stack_length(&self)->u8{
+        self.stack.len()
+    }
+
+    /// Borrows an element from the stack
+    pub fn borrow_stack_element(&self, index:u8)->&Value{
+        &self.stack[index]
+    }
+
     fn for_loop(&mut self)->Result<(),String>{
         unimplemented!();
         /*                
@@ -291,25 +299,17 @@ impl VM {
     fn and(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
+        // Check if A is a Bool
         match a {
-            Value::Bool(v)=>{
-                if !v { // If not A then A and B can't be true
-                    self.push(Value::Bool(false));
-                    Ok(())
-                }else{
-                    // If A, then check B
-                    match b {
-                        Value::Bool(v)=>{
-                            if v {
-                                self.push(Value::Bool(true));                                
-                            }else{
-                                self.push(Value::Bool(false));                                
-                            }
-                            Ok(())
-                        },
-                        _ => Err( "Cannot use 'and' operator because expression at the right of 'and' is not a Boolean".to_string() )
-                    }
-                }
+            Value::Bool(value_a)=>{
+                // Check if B is a Bool
+                match b {
+                    Value::Bool(value_b)=>{
+                        self.push(Value::Bool(value_a && value_b));
+                        Ok(())
+                    },
+                    _ => Err( "Cannot use 'and' operator because expression at the right of 'and' is not a Boolean".to_string() )
+                }                
             },
             _ => Err( "Cannot use 'and' operator because expression at the left of 'and' is not a Boolean".to_string() )
         }
@@ -319,28 +319,19 @@ impl VM {
     fn or(&mut self)->Result<(),String>{
         let b = self.pop().unwrap();
         let a = self.pop().unwrap();
+        // Check if A is a Bool
         match a {
-            Value::Bool(v)=>{
-                if v { // If A then A or B must be true
-                    self.push(Value::Bool(true));
-                    Ok(())
-                }else{
-                    // If not A, then check B
-                    match b {
-                        // if B, then it is true
-                        Value::Bool(v)=>{
-                            if v {
-                                self.push(Value::Bool(true));                                
-                            }else{
-                                self.push(Value::Bool(false));
-                            }
-                            Ok(())
-                        },
-                        _ =>Err( "Cannot use 'or' operator because expression at the right of 'or' is not a Boolean".to_string() )
-                    }
-                }
+            Value::Bool(value_a)=>{
+                // Check if B is a Bool
+                match b {
+                    Value::Bool(value_b)=>{
+                        self.push(Value::Bool(value_a || value_b));
+                        Ok(())
+                    },
+                    _ => Err( "Cannot use 'or' operator because expression at the right of 'and' is not a Boolean".to_string() )
+                }                
             },
-            _ => Err( "Cannot use 'or' operator because expression at the left of 'or' is not a Boolean".to_string() )
+            _ => Err( "Cannot use 'or' operator because expression at the left of 'and' is not a Boolean".to_string() )
         }
     }
 
@@ -413,34 +404,36 @@ impl VM {
     /// Calls a function
     fn call(&mut self, n_args: u8, frame_n: &mut u8, advance: &mut bool)->Result<(),String>{
         
-        let f_ref = self.stack[ self.stack.len() as u8 - n_args - 1 ].clone();
+        let f_ref = &self.stack[ self.stack.len() as u8 - n_args - 1 ];//.clone();
 
         let function = match f_ref {
             Value::HeapRef(i) => {
-                match self.handler.heap.get(i).unwrap()
+                match self.handler.heap.get(*i).unwrap()
                     .as_any()
                     .downcast_ref::<Function>(){
                         Some(f)=>f.clone_rc(),
-                        None => return Err(format!("Trying to call from a '{}' object as if it was a function", self.handler.heap.get(i).unwrap().type_name()))
+                        None => return Err(format!("Trying to call from a '{}' object as if it was a function", self.handler.heap.get(*i).unwrap().type_name()))
                     }                                                
             },
             Value::PackageRef(i) => {
                                 
                 // get the function from the surrounding function (i.e. the current one)                                                                        
                 //let function = 
-                self.handler.packages_elements[i as usize].clone_rc()
+                self.handler.packages_elements[*i as usize].clone_rc()
                                                                                             
             },
             _ => {
                 // THis is an error... this is here just to send a 
-                // better error message
+                // better error message. I don't care about performance
+                // at this stage
+                let f_ref = &self.stack[ self.stack.len() as u8 - n_args - 1 ].clone();
                 match f_ref.call(self, n_args){
                     // This should never be successful because all 
                     // objects that can be called as functions 
                     // are in the heap (thus, HeapRef)
                     Ok(_)=>unreachable!(),
                     Err(e)=>return Err(e)
-                }
+                }                
             }
         };// end of retrieve the function
 
@@ -708,7 +701,7 @@ impl VM {
             let current_operation = self.call_frames[frame_n].current_instruction().unwrap();            
             
             if let Operation::Return = current_operation {
-                /* IF THIS SI THE RETURN FROM A FUNCTION */
+                /* IF THIS IS THE RETURN FROM A FUNCTION */
                 if frame_n > 0 {                        
                     match self.return_op(&mut frame_n){
                         Ok(_)=>{},
@@ -775,7 +768,22 @@ impl VM {
         }
     }
 
-    /// Fetches a Heap reference, returning a mutable reference to ut
+    pub fn borrow_heap_reference(&self, i:u8)->Option<&Box<dyn ValueTrait>>{
+        self.handler.heap.get(i)
+    }
+
+    /// Borrows a package references, returning a reference to it
+    pub fn borrow_package_reference(&self, i: usize) -> Result<&Function, &str> {
+        if i < self.handler.packages_elements.len(){
+            Ok(&self.handler.packages_elements[i])
+        }else{
+            Err("index out of bounds when borrow_package_reference from VM")
+        }
+    }
+ 
+
+
+    /// Fetches a Heap reference, returning a mutable reference to it
     pub fn resolve_heap_reference(&mut self, v: Value) -> Result<&mut Box<dyn ValueTrait>, &str> {
         
         if let Value::HeapRef(i)= v {
@@ -789,15 +797,7 @@ impl VM {
         }
     }
 
-    /// Fetches a package references, returning a reference to it
-    pub fn resolve_package_reference(&self, v: Value) -> Result<&Function, &str> {
-        
-        if let Value::PackageRef(i)= v {
-            Ok(&self.handler.packages_elements[i])
-        } else {
-            Err("resolve_package_reference() requires a Value::PackageRef() as an argument")
-        }
-    }
+    
     
     
 }

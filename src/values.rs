@@ -27,10 +27,7 @@ pub enum Value {
 
     /// A reference to an object allocated in the 
     /// package elements vector
-    PackageRef(usize), 
-
-    
-        
+    PackageRef(usize),         
 }
 
 

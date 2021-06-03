@@ -1,8 +1,9 @@
 
 let a = 1
 
-while a < 99999999 {    
+while a < 9 {    
+    io::print("-",a,"==")
     a = a + 1
 }
 
-io::print(123)
+ io::print(a)

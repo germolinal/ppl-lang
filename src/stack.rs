@@ -11,13 +11,14 @@ pub struct Stack<T> {
 
 impl <T>Stack<T>{
     
+    // A copyable None element... used for initializing
+    const NONE: Option<T> = None; 
+    
     /// Creates a new Stack, full of None and length 0        
     pub fn new()->Self{
-        // A copyable None element
-        const NONE: Option<T> = None; 
         Self{
             len: 0,            
-            elements: [NONE; u8::MAX as usize]
+            elements: [Self::NONE; u8::MAX as usize]
         }
     }
 

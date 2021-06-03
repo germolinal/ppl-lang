@@ -5,21 +5,27 @@ use crate::values::Value;
 use crate::vm::VM;
 
 fn print(n_args: u8, vm: &mut VM)->u8{
-            
-
-    for _ in 0..n_args {    
-        let v = vm.pop().unwrap();
+           
+    let fin = vm.stack_length();
+    let ini = fin - n_args;
+    // Print them first (in the right order)
+    for i in ini..fin {    
+        let v = vm.borrow_stack_element(i);//vm.pop().unwrap();
         match v {
-            Value::HeapRef(_)=>{
-                print!("{} ", vm.resolve_heap_reference(v).unwrap().to_string())                
+            Value::HeapRef(index)=>{
+                print!("{} ", vm.borrow_heap_reference(*index).unwrap().to_string())                
             },
-            Value::PackageRef(_)=>{
-                print!("{} ", vm.resolve_package_reference(v).unwrap().to_string())                
+            Value::PackageRef(index)=>{
+                print!("{} ", vm.borrow_package_reference(*index).unwrap().to_string())                
             },
             _ => print!("{} ", v.to_string()),
         }                
     }
     println!();
+    // Pop them all
+    for _ in ini..fin{
+        vm.pop().unwrap();
+    }
 
     0
 }
