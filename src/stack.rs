@@ -13,20 +13,11 @@ impl <T>Stack<T>{
     
     /// Creates a new Stack, full of None and length 0        
     pub fn new()->Self{
+        // A copyable None element
+        const NONE: Option<T> = None; 
         Self{
-
-            len: 0,
-            // We need this because the elements are do not 
-            // satisfy the Copy trait requirement... although this
-            // should not be considered unsafe because all the elements are
-            // initialized as 'None' anyway.
-            elements: unsafe {
-                let mut arr: [Option<T>; u8::MAX as usize] = std::mem::MaybeUninit::uninit().assume_init();//std::mem::uninitialized();
-                for item in &mut arr[..] {
-                    std::ptr::write(item, None);
-                }
-                arr
-            }
+            len: 0,            
+            elements: [NONE; u8::MAX as usize]
         }
     }
 

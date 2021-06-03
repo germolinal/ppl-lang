@@ -18,22 +18,13 @@ pub struct HeapList {
 
 impl HeapList {
 
-    pub fn new()->Self{        
+    pub fn new()->Self{     
+        // A copyable None element
+        const NONE: Option<Element> = None;   
         Self{
             first_free: 0,
-            n_elements: 0,
-
-            // We need this because the elements are do not 
-            // satisfy the Copy trait requirement... although this
-            // should not be considered unsafe because all the elements are
-            // initialized as 'None' anyway.
-            elements: unsafe {
-                let mut arr: [Option<Element>; u8::MAX as usize] = std::mem::MaybeUninit::uninit().assume_init();//std::mem::uninitialized();
-                for item in &mut arr[..] {
-                    std::ptr::write(item, None);
-                }
-                arr
-            },
+            n_elements: 0,            
+            elements: [NONE; u8::MAX as usize],
         }
     }    
 
